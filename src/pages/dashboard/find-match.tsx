@@ -132,7 +132,7 @@ export default function DashboardFindMatchPage() {
       'cette famille'
 
     const confirmed = window.confirm(
-      `Le nombre de demandes est limité à une fois par période d’exclusivité et par trajet. Voulez-vous contacter ${parentName} ?`
+      `Le nombre de demandes est limité à une fois par jour et par trajet. Voulez-vous contacter ${parentName} ?`
     )
 
     if (!confirmed) return

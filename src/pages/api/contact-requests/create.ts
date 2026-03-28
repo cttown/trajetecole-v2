@@ -419,7 +419,8 @@ export default async function handler(
       })
     }
 
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    //const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    const expiresAt = new Date(Date.now() + 1000).toISOString()
 
     const { data: createdRequest, error: createRequestError } = await supabaseAdmin
       .from('contact_requests')
