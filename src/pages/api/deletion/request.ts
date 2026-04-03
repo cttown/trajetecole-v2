@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
+import crypto from 'crypto'
 import { createClient } from '@supabase/supabase-js'
 import {
   buildEmailLayout,
@@ -11,6 +12,8 @@ type RequestBody = {
   email?: string
   website?: string
 }
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 
 function requireEnv(name: string): string {
   const value = process.env[name]
@@ -25,7 +28,7 @@ function getAppBaseUrl() {
 }
 
 function isValidEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+  return EMAIL_REGEX.test(value)
 }
 
 function trimOrEmpty(value: unknown) {
@@ -50,7 +53,7 @@ export default async function handler(
     }
 
     if (!email || !isValidEmail(email)) {
-      return res.status(400).json({ error: 'Adresse email invalide.' })
+      return res.status(400).json({ error: 'Format erroné.' })
     }
 
     const supabaseUrl = requireEnv('NEXT_PUBLIC_SUPABASE_URL')
@@ -69,7 +72,7 @@ export default async function handler(
       return res.status(200).json({
         ok: true,
         message:
-          'Si cette adresse est connue, un email de confirmation va être envoyé.',
+          'Si cette adresse correspond à un compte TrajetEcole, un email de confirmation vient d’être envoyé.',
       })
     }
 
@@ -140,7 +143,7 @@ export default async function handler(
     return res.status(200).json({
       ok: true,
       message:
-        'Si cette adresse est connue, un email de confirmation va être envoyé.',
+        'Si cette adresse correspond à un compte TrajetEcole, un email de confirmation vient d’être envoyé.',
     })
   } catch (error) {
     const message =

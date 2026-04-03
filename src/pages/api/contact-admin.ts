@@ -11,6 +11,10 @@ type ContactAdminBody = {
   website?: string
 }
 
+const NAME_REGEX = /^[A-Za-zÀ-ÖØ-öø-ÿ]+(?:[ '\-][A-Za-zÀ-ÖØ-öø-ÿ]+)*$/
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
+const MESSAGE_MAX_LENGTH = 2000
+
 function requireEnv(name: string): string {
   const value = process.env[name]
   if (!value) {
@@ -20,7 +24,11 @@ function requireEnv(name: string): string {
 }
 
 function isValidEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+  return EMAIL_REGEX.test(value)
+}
+
+function isValidName(value: string) {
+  return NAME_REGEX.test(value)
 }
 
 function trimOrEmpty(value: unknown) {
@@ -57,9 +65,15 @@ export default async function handler(
       return res.status(200).json({ ok: true })
     }
 
-    if (!email || !subject || !message) {
+    if (!parentFirstName || !parentLastName || !email || !subject || !message) {
       return res.status(400).json({
-        error: 'Email, sujet et message sont obligatoires.',
+        error: 'Tous les champs sont obligatoires.',
+      })
+    }
+
+    if (!isValidName(parentFirstName) || !isValidName(parentLastName)) {
+      return res.status(400).json({
+        error: 'Le prénom et le nom doivent contenir uniquement des lettres.',
       })
     }
 
@@ -81,7 +95,7 @@ export default async function handler(
       })
     }
 
-    if (message.length > 5000) {
+    if (message.length > MESSAGE_MAX_LENGTH) {
       return res.status(400).json({
         error: 'Le message est trop long.',
       })
@@ -94,8 +108,8 @@ export default async function handler(
     const { error: insertError } = await supabaseAdmin
       .from('admin_contact_messages')
       .insert({
-        parent_first_name: parentFirstName || null,
-        parent_last_name: parentLastName || null,
+        parent_first_name: parentFirstName,
+        parent_last_name: parentLastName,
         email,
         subject,
         message,
@@ -108,8 +122,7 @@ export default async function handler(
 
     const adminEmail = getAdminContactEmail()
     const appBaseUrl = getAppBaseUrl()
-    const parentDisplayName =
-      `${parentFirstName} ${parentLastName}`.trim() || email
+    const parentDisplayName = `${parentFirstName} ${parentLastName}`.trim()
 
     try {
       await sendEmail({
@@ -153,13 +166,19 @@ export default async function handler(
         subject: 'Nous avons bien reçu votre message — TrajetEcole',
         html: buildEmailLayout({
           title: 'Message bien reçu',
-          intro: `Bonjour ${parentFirstName || ''}`.trim() || 'Bonjour,',
+          intro: `Bonjour ${parentFirstName},`,
           sections: [
             {
               title: 'Récapitulatif',
               lines: [
                 `Sujet : ${subject}`,
-                `Votre message a bien été transmis à l’administrateur du site.`,
+                `Message : ${message}`,
+              ],
+            },
+            {
+              title: 'Confirmation',
+              lines: [
+                'Votre message a bien été transmis à l’administrateur du site.',
               ],
             },
           ],

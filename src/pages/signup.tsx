@@ -1,32 +1,121 @@
 import Head from 'next/head'
-import { FormEvent, useState } from 'react'
-import { useRouter } from 'next/router'
+import { FormEvent, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '../lib/supabaseClient'
 import styles from '../styles/FormPages.module.css'
 
-export default function SignupPage() {
-  const router = useRouter()
+const NAME_REGEX = /^[A-Za-zÀ-ÖØ-öø-ÿ]+(?:[ '\-][A-Za-zÀ-ÖØ-öø-ÿ]+)*$/
 
+function validateName(value: string) {
+  const trimmed = value.trim()
+
+  if (!trimmed) {
+    return 'Ce champ est obligatoire.'
+  }
+
+  if (!NAME_REGEX.test(trimmed)) {
+    return 'Utilisez uniquement des lettres.'
+  }
+
+  return ''
+}
+
+function validatePassword(value: string) {
+  const trimmed = value.trim()
+
+  if (!trimmed) {
+    return 'Le mot de passe est obligatoire.'
+  }
+
+  if (trimmed.length < 6) {
+    return 'Minimum 6 caractères.'
+  }
+
+  return ''
+}
+
+function isFormDirty(values: {
+  parentFirstName: string
+  parentLastName: string
+  email: string
+  password: string
+}) {
+  return Object.values(values).some((value) => value.trim() !== '')
+}
+
+export default function SignupPage() {
   const [parentFirstName, setParentFirstName] = useState('')
   const [parentLastName, setParentLastName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+
+  const [parentFirstNameError, setParentFirstNameError] = useState('')
+  const [parentLastNameError, setParentLastNameError] = useState('')
+  const [passwordError, setPasswordError] = useState('')
+
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [showLeaveModal, setShowLeaveModal] = useState(false)
+  const [submittedEmail, setSubmittedEmail] = useState('')
+
+  const dirty = useMemo(
+    () =>
+      isFormDirty({
+        parentFirstName,
+        parentLastName,
+        email,
+        password,
+      }),
+    [parentFirstName, parentLastName, email, password]
+  )
+
+  function resetForm() {
+    setParentFirstName('')
+    setParentLastName('')
+    setEmail('')
+    setPassword('')
+    setParentFirstNameError('')
+    setParentLastNameError('')
+    setPasswordError('')
+    setError('')
+  }
+
+  function validateForm() {
+    const firstNameMessage = validateName(parentFirstName)
+    const lastNameMessage = validateName(parentLastName)
+    const passwordMessage = validatePassword(password)
+
+    setParentFirstNameError(firstNameMessage)
+    setParentLastNameError(lastNameMessage)
+    setPasswordError(passwordMessage)
+
+    return !firstNameMessage && !lastNameMessage && !passwordMessage
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError('')
+
+    if (!validateForm()) {
+      return
+    }
+
     setLoading(true)
 
+    const normalizedFirstName = parentFirstName.trim()
+    const normalizedLastName = parentLastName.trim()
+    const normalizedEmail = email.trim().toLowerCase()
+    const normalizedPassword = password.trim()
+
     const { error } = await supabase.auth.signUp({
-      email,
-      password,
+      email: normalizedEmail,
+      password: normalizedPassword,
       options: {
         data: {
-          parent_first_name: parentFirstName,
-          parent_last_name: parentLastName,
+          parent_first_name: normalizedFirstName,
+          parent_last_name: normalizedLastName,
         },
       },
     })
@@ -38,7 +127,18 @@ export default function SignupPage() {
       return
     }
 
-    router.push('/dashboard')
+    setSubmittedEmail(normalizedEmail)
+    resetForm()
+    setShowSuccessModal(true)
+  }
+
+  function handleBackHomeClick(e: React.MouseEvent<HTMLAnchorElement>) {
+    if (!dirty) {
+      return
+    }
+
+    e.preventDefault()
+    setShowLeaveModal(true)
   }
 
   return (
@@ -73,7 +173,7 @@ export default function SignupPage() {
               <div className={styles.formCard}>
                 <h2 className={styles.formTitle}>Créer mon compte</h2>
 
-                <form onSubmit={handleSubmit} className={styles.form}>
+                <form onSubmit={handleSubmit} className={styles.form} noValidate>
                   <div className={styles.fieldRow}>
                     <div className={styles.field}>
                       <label htmlFor="parentFirstName">Prénom</label>
@@ -82,8 +182,14 @@ export default function SignupPage() {
                         type="text"
                         value={parentFirstName}
                         onChange={(e) => setParentFirstName(e.target.value)}
+                        onBlur={() =>
+                          setParentFirstNameError(validateName(parentFirstName))
+                        }
                         required
                       />
+                      {parentFirstNameError ? (
+                        <p className={styles.fieldError}>{parentFirstNameError}</p>
+                      ) : null}
                     </div>
 
                     <div className={styles.field}>
@@ -93,8 +199,12 @@ export default function SignupPage() {
                         type="text"
                         value={parentLastName}
                         onChange={(e) => setParentLastName(e.target.value)}
+                        onBlur={() => setParentLastNameError(validateName(parentLastName))}
                         required
                       />
+                      {parentLastNameError ? (
+                        <p className={styles.fieldError}>{parentLastNameError}</p>
+                      ) : null}
                     </div>
                   </div>
 
@@ -116,12 +226,14 @@ export default function SignupPage() {
                       type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      onBlur={() => setPasswordError(validatePassword(password))}
                       required
                       minLength={6}
                     />
-                    <p className={styles.helperText}>
-                      Minimum 6 caractères.
-                    </p>
+                    <p className={styles.helperText}>Minimum 6 caractères.</p>
+                    {passwordError ? (
+                      <p className={styles.fieldError}>{passwordError}</p>
+                    ) : null}
                   </div>
 
                   <button type="submit" disabled={loading} className={styles.primaryButton}>
@@ -139,7 +251,11 @@ export default function SignupPage() {
                 </p>
 
                 <div className={styles.secondaryActions}>
-                  <Link href="/" className={styles.secondaryButton}>
+                  <Link
+                    href="/"
+                    className={styles.secondaryButton}
+                    onClick={handleBackHomeClick}
+                  >
                     Retour à l’accueil
                   </Link>
                 </div>
@@ -148,6 +264,51 @@ export default function SignupPage() {
           </div>
         </section>
       </main>
+
+      {showSuccessModal ? (
+        <div className={styles.modalOverlay} role="dialog" aria-modal="true">
+          <div className={styles.modalCard}>
+            <h3 className={styles.modalTitle}>Compte presque créé</h3>
+            <p className={styles.modalText}>
+              Un email a été envoyé à l’adresse <strong>{submittedEmail}</strong>.
+              Consultez votre messagerie pour valider la création de votre compte.
+            </p>
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                onClick={() => setShowSuccessModal(false)}
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showLeaveModal ? (
+        <div className={styles.modalOverlay} role="dialog" aria-modal="true">
+          <div className={styles.modalCard}>
+            <h3 className={styles.modalTitle}>Quitter cette page ?</h3>
+            <p className={styles.modalText}>
+              Les informations saisies seront perdues. Voulez-vous rester sur la
+              page ou revenir à l’accueil ?
+            </p>
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={() => setShowLeaveModal(false)}
+              >
+                Rester sur la page
+              </button>
+              <Link href="/" className={styles.primaryButton}>
+                Retour à l’accueil
+              </Link>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   )
 }
