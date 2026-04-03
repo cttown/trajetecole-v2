@@ -110,6 +110,12 @@ export default function DashboardFindMatchPage() {
     return 'Lieu non renseigné'
   }
 
+  function getCompatibilityLabel(score: number) {
+    if (score >= 80) return 'Très compatible'
+    if (score >= 60) return 'Compatible'
+    return 'Peu compatible'
+  }
+
   async function launchMatching() {
     setError('')
     setSuccess('')
@@ -132,7 +138,11 @@ export default function DashboardFindMatchPage() {
       'cette famille'
 
     const confirmed = window.confirm(
-      `Le nombre de demandes est limité à une fois par jour et par trajet. Voulez-vous contacter ${parentName} ?`
+      `Envoyer une demande à ${parentName} ?
+
+Le parent recevra votre demande et pourra accepter ou refuser.
+
+👉 Vous pourrez refaire une demande plus tard si besoin.`
     )
 
     if (!confirmed) return
@@ -156,7 +166,7 @@ export default function DashboardFindMatchPage() {
       })
 
       setSuccess(
-        'Votre demande a bien été envoyée. Pour un même trajet, vous pourrez renouveler une demande après 24h.'
+        'Votre demande a été envoyée ✅ Le parent a été notifié et peut vous répondre rapidement. Vous serez informé par email.'
       )
       setStep(4)
     } catch (err) {
@@ -246,8 +256,8 @@ export default function DashboardFindMatchPage() {
               <div>
                 <h1 className={styles.pageTitle}>Trouver une correspondance</h1>
                 <p className={styles.pageIntro}>
-                  Suivez les étapes pour vérifier vos informations et rechercher des familles
-                  compatibles.
+                  Suivez les étapes pour vérifier vos informations et trouver des parents
+                  compatibles avec vos trajets.
                 </p>
               </div>
               <div className={styles.topbarActions}>
@@ -339,6 +349,17 @@ export default function DashboardFindMatchPage() {
                   <TripList title="Trajets archivés" items={archivedTrips} />
                 </div>
 
+                {readyTrips.length === 0 ? (
+                  <p className={styles.statusMessage}>
+                    Aucun trajet prêt pour la recherche.
+                    <br />
+                    <br />
+                    Vérifiez que vos trajets :
+                    <br />• sont en statut "Recherche"
+                    <br />• ont un départ et une destination validés
+                  </p>
+                ) : null}
+
                 <div className={styles.itemActions}>
                   <button
                     type="button"
@@ -356,7 +377,9 @@ export default function DashboardFindMatchPage() {
                     onClick={launchMatching}
                     disabled={readyTrips.length === 0 || loadingMatching}
                   >
-                    {loadingMatching ? 'Recherche en cours...' : 'Lancer la recherche'}
+                    {loadingMatching
+                      ? 'Recherche des parents compatibles...'
+                      : 'Trouver un parent'}
                   </button>
                 </div>
               </div>
@@ -368,7 +391,12 @@ export default function DashboardFindMatchPage() {
 
                 {results.length === 0 ? (
                   <p className={styles.statusMessage}>
-                    Aucune famille compatible trouvée pour le moment. Renevez à votre espace pour effectuer des recherches ultérieusement !
+                    Aucun parent compatible trouvé pour le moment.
+                    <br />
+                    <br />
+                    👉 Vous pouvez :
+                    <br />• modifier vos trajets pour élargir la recherche
+                    <br />• revenir plus tard, de nouveaux parents peuvent s’inscrire
                   </p>
                 ) : (
                   <div className={styles.itemList}>
@@ -385,7 +413,8 @@ export default function DashboardFindMatchPage() {
                             </p>
                           </div>
                           <span className={styles.badgeGreen}>
-                            Score {match.compatibility_score}/100
+                            {getCompatibilityLabel(match.compatibility_score)} (
+                            {match.compatibility_score}/100)
                           </span>
                         </div>
 
@@ -451,13 +480,15 @@ export default function DashboardFindMatchPage() {
               <div className={styles.sectionCard}>
                 <h2 className={styles.sectionTitle}>Étape 4 — Suite</h2>
                 <p className={styles.sectionText}>
-                  Votre demande apparaît maintenant dans vos demandes envoyées. La réponse de l’autre
-                  parent sera visible dans votre espace personnel.
+                  Votre demande a bien été envoyée.
+                  <br />
+                  <br />
+                  👉 Le parent va recevoir votre demande et peut y répondre rapidement.
+                  Vous serez informé dès qu’il répond.
                 </p>
 
                 <p className={styles.statusMessage}>
-                  Pour un même trajet, vous pourrez renouveler une demande de mise en relation après
-                  24h.
+                  Vous pouvez suivre l’état de votre demande dans votre espace personnel.
                 </p>
 
                 <div className={styles.itemActions}>

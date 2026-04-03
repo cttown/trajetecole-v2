@@ -117,7 +117,6 @@ export default async function handler(
               title: 'Important',
               lines: [
                 'Cette action supprimera vos données actives du site.',
-                'Une copie d’archive sera conservée hors des fonctionnalités de matching et de connexion.',
                 'Ce lien est valable pendant 1 heure.',
               ],
             },
