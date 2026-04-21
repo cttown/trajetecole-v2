@@ -4,6 +4,7 @@ import { useRouter } from 'next/router'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabaseClient'
 import styles from '../../styles/Dashboard.module.css'
+import { getPriorityDelayText } from '../../lib/contactRequestConfig'
 
 type Family = {
   id: string
@@ -163,6 +164,11 @@ function isTripReadyForMatching(trip: Trip): boolean {
     !trip.from_place_suggestion_id &&
     !trip.to_place_suggestion_id
   )
+}
+
+function formatHour(value: string | null) {
+  if (!value) return '—'
+  return value.slice(0, 5)
 }
 
 function getTripBlockingReason(trip: Trip): string | null {
@@ -1328,10 +1334,6 @@ export default function DashboardTripsPage() {
     setSuccess(`Statut du trajet mis à jour : ${formatTripStatus(nextStatus)}.`)
   }
 
-  async function handleLogout() {
-    await supabase.auth.signOut()
-    router.push('/login')
-  }
 
   if (loading) {
     return (
@@ -1438,8 +1440,8 @@ export default function DashboardTripsPage() {
                                 {formatSingleDay(trip.day_of_week)}
                               </h4>
                               <p className={styles.itemMeta}>
-                                Départ : {trip.from_time}
-                                {trip.to_time ? ` | Arrivée : ${trip.to_time}` : ''}
+                                Départ : {formatHour(trip.from_time)}
+                                {trip.to_time ? ` | Arrivée : ${formatHour(trip.to_time)}` : ''}
                               </p>
                             </div>
 
@@ -1516,12 +1518,12 @@ export default function DashboardTripsPage() {
             <div className={styles.topbar}>
               <div>
                 <h1 className={styles.pageTitle}>Trajets</h1>
-                <p className={styles.pageIntro}>Ajoutez, modifiez et vérifiez vos trajets.</p>
+                <p className={styles.pageIntro}>Ajoutez et modifiez vos trajets.</p>
               </div>
 
               <div className={styles.topbarActions}>
                 <Link href="/dashboard" className={styles.secondaryButton}>
-                  Retour dashboard
+                  Retour Mon espace
                 </Link>
                 {fromFindMatch ? (
                   <Link href="/dashboard/find-match" className={styles.primaryButton}>
@@ -1857,14 +1859,13 @@ export default function DashboardTripsPage() {
             <div className={styles.itemActions}>
               <Link href="/" className={styles.secondaryButton}>
                 Accueil
-              </Link>
-              <button onClick={handleLogout} className={styles.secondaryButton}>
-                Se déconnecter
-              </button>
-            </div>
+              </Link>            </div>
 
             {error ? <p className={styles.errorMessage}>{error}</p> : null}
             {success ? <p className={styles.successMessage}>{success}</p> : null}
+            <p className={styles.smallMuted} style={{ fontStyle: 'italic', marginTop: 8 }}>
+              Pendant le délai de priorité ({getPriorityDelayText()}), vous ne pouvez pas envoyer une nouvelle demande pour ce même trajet.
+            </p>
           </div>
         </section>
       </main>

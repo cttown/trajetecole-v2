@@ -1,10 +1,18 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
+import { useRouter } from 'next/router'
+import { supabase } from '../lib/supabaseClient'
 import { trackEvent } from '../lib/trackEvent'
 import styles from '../styles/Home.module.css'
 
 export default function HomePage() {
+  const router = useRouter()
+
+  const [isAuthChecked, setIsAuthChecked] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [userEmail, setUserEmail] = useState('')
+
   useEffect(() => {
     trackEvent({
       eventType: 'page_view',
@@ -12,6 +20,39 @@ export default function HomePage() {
       path: '/',
     })
   }, [])
+
+  useEffect(() => {
+    async function loadAuthState() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      setIsLoggedIn(!!user)
+      setUserEmail(user?.email || '')
+      setIsAuthChecked(true)
+    }
+
+    loadAuthState()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session?.user)
+      setUserEmail(session?.user?.email || '')
+      setIsAuthChecked(true)
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    setIsLoggedIn(false)
+    setUserEmail('')
+    router.push('/')
+  }
 
   return (
     <>
@@ -39,15 +80,33 @@ export default function HomePage() {
                   activités du quotidien.
                 </p>
 
-                <div className={styles.heroButtons}>
-                  <Link href="/signup" className={styles.primaryButton}>
-                    Créer un compte
-                  </Link>
+                {isAuthChecked && isLoggedIn ? (
+                  <>
+                    <p className={styles.connectionInfo}>
+                      Connecté avec : <strong>{userEmail}</strong>
+                    </p>
 
-                  <Link href="/login" className={styles.secondaryButton}>
-                    Se connecter
-                  </Link>
-                </div>
+                    <div className={styles.heroButtons}>
+                      <Link href="/dashboard" className={styles.primaryButton}>
+                        Mon espace
+                      </Link>
+
+                      <button type="button" className={styles.secondaryButton} onClick={handleLogout}>
+                        Se déconnecter
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className={styles.heroButtons}>
+                    <Link href="/signup" className={styles.primaryButton}>
+                      Créer un compte
+                    </Link>
+
+                    <Link href="/login" className={styles.secondaryButton}>
+                      Se connecter
+                    </Link>
+                  </div>
+                )}
               </div>
 
               <div className={styles.heroRight}>
@@ -115,7 +174,7 @@ export default function HomePage() {
               <div className={styles.stepCard}>
                 <div className={styles.stepNumber}>3</div>
                 <h3>Envoyer une demande</h3>
-                <p>Suivi dans le dashboard.</p>
+                <p>Suivi dans Mon espace.</p>
               </div>
             </div>
           </div>
@@ -166,15 +225,17 @@ export default function HomePage() {
         <section className={styles.quickLinksSection}>
           <div className={styles.container}>
             <div className={styles.quickLinksGrid}>
-              <Link href="/signup" className={styles.quickLinkCard}>
-                <div className={styles.quickLinkIcon}>👤</div>
-                <span>Créer un compte</span>
-              </Link>
-
-              <Link href="/dashboard" className={styles.quickLinkCard}>
-                <div className={styles.quickLinkIcon}>📊</div>
-                <span>Dashboard</span>
-              </Link>
+              {!isLoggedIn ? (
+                <Link href="/signup" className={styles.quickLinkCard}>
+                  <div className={styles.quickLinkIcon}>👤</div>
+                  <span>Créer un compte</span>
+                </Link>
+              ) : (
+                <Link href="/dashboard" className={styles.quickLinkCard}>
+                  <div className={styles.quickLinkIcon}>📁</div>
+                  <span>Mon espace</span>
+                </Link>
+              )}
 
               <Link href="/contact-admin" className={styles.quickLinkCard}>
                 <div className={styles.quickLinkIcon}>✉️</div>

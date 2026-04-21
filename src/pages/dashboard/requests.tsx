@@ -17,6 +17,7 @@ import {
   cancelContactRequest,
   closeContactRequest,
 } from '../../lib/dashboardShared'
+import { getPriorityDelayText } from '../../lib/contactRequestConfig'
 
 export default function DashboardRequestsPage() {
   const router = useRouter()
@@ -130,7 +131,7 @@ export default function DashboardRequestsPage() {
           <div>
             <h3 className={styles.itemTitle}>{formatFullParentName(item)}</h3>
             <p className={styles.itemMeta}>
-              Créée le {formatDateTime(item.created_at)} · Exclusivité jusqu’au{' '}
+              Créée le {formatDateTime(item.created_at)} · Délai de priorité jusqu’au{' '}
               {formatDateTime(item.expires_at)}
             </p>
           </div>
@@ -164,7 +165,7 @@ export default function DashboardRequestsPage() {
                   <strong>Jour :</strong> {formatSingleDay(requesterTrip?.day_of_week ?? 0)}
                 </p>
                 <p>
-                  <strong>Horaires :</strong> {formatTripTimeRange(requesterTrip)}
+                  <strong>Votre horaire :</strong> {formatTripTimeRange(requesterTrip)}
                 </p>
                 <p>
                   <strong>Départ :</strong>{' '}
@@ -176,7 +177,7 @@ export default function DashboardRequestsPage() {
                 </p>
                 <p className={styles.smallMuted}>
                   {mode === 'received'
-                    ? `Votre horaire correspondant : ${formatTripTimeRange(targetTrip)}`
+                    ? `Horaire de l’autre famille : ${formatTripTimeRange(targetTrip)}`
                     : `Horaire de l’autre famille : ${formatTripTimeRange(targetTrip)}`}
                 </p>
               </div>
@@ -281,13 +282,16 @@ export default function DashboardRequestsPage() {
               </div>
               <div className={styles.topbarActions}>
                 <Link href="/dashboard" className={styles.secondaryButton}>
-                  Retour dashboard
+                  Retour Mon espace
                 </Link>
               </div>
             </div>
 
             {error ? <p className={styles.errorMessage}>{error}</p> : null}
             {success ? <p className={styles.successMessage}>{success}</p> : null}
+            <p className={styles.smallMuted} style={{ fontStyle: 'italic', marginTop: 8 }}>
+              Pendant le délai de priorité ({getPriorityDelayText()}), vous ne pouvez pas envoyer une nouvelle demande pour ce même trajet.
+            </p>
 
             <div className={styles.grid2}>
               <div className={styles.sectionCard}>

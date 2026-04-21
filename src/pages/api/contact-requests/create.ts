@@ -5,6 +5,10 @@ import {
   createContactRequestEmailActionToken,
   sendEmail,
 } from '../../../lib/email'
+import {
+  CONTACT_REQUEST_PRIORITY_MS,
+  getPriorityDelayText,
+} from '../../../lib/contactRequestConfig'
 
 type CreateContactRequestBody = {
   target_family_id: string
@@ -142,8 +146,13 @@ function formatDay(dayOfWeek: number) {
   return labels[dayOfWeek] || `Jour ${dayOfWeek}`
 }
 
+function formatHour(value: string | null) {
+  if (!value) return '—'
+  return value.slice(0, 5)
+}
+
 function formatTripTimeRange(trip: TripRow) {
-  return trip.to_time ? `${trip.from_time} → ${trip.to_time}` : trip.from_time
+  return trip.to_time ? `${formatHour(trip.from_time)} → ${formatHour(trip.to_time)}` : formatHour(trip.from_time)
 }
 
 function formatPlace(placeId: string | null, placeMap: Record<string, PlaceRow>) {
@@ -255,7 +264,7 @@ export default async function handler(
 
       if (isStillExclusive) {
         return res.status(409).json({
-          error: `Vous avez déjà une demande en attente avec ${targetName}. L’exclusivité court jusqu’au ${new Date(
+          error: `Vous avez déjà une demande en attente avec ${targetName}. Le délai de priorité court jusqu’au ${new Date(
             request.expires_at
           ).toLocaleString('fr-FR')}.`,
           code: 'REQUEST_ALREADY_PENDING',
@@ -357,7 +366,7 @@ export default async function handler(
     if (hasBlockingLink) {
       return res.status(409).json({
         error:
-          'Au moins un trajet sélectionné est déjà engagé dans une demande active ou encore sous exclusivité.',
+          'Au moins un trajet sélectionné est déjà engagé dans une demande active ou encore pendant le délai de priorité.',
         code: 'REQUESTER_TRIP_ALREADY_ENGAGED',
       })
     }
@@ -419,8 +428,7 @@ export default async function handler(
       })
     }
 
-    //const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-    const expiresAt = new Date(Date.now() + 1000).toISOString()
+    const expiresAt = new Date(Date.now() + CONTACT_REQUEST_PRIORITY_MS).toISOString()
 
     const { data: createdRequest, error: createRequestError } = await supabaseAdmin
       .from('contact_requests')
@@ -496,10 +504,10 @@ export default async function handler(
           `Trajet ${index + 1}`,
           `Enfant : ${child?.first_name || '—'}`,
           `Jour : ${formatDay(requesterTrip.day_of_week)}`,
-          `Horaires demandés : ${formatTripTimeRange(requesterTrip)}`,
+          `Votre horaire : ${formatTripTimeRange(requesterTrip)}`,
           `Départ : ${formatPlace(requesterTrip.from_place_id, placeMap)}`,
           `Arrivée : ${formatPlace(requesterTrip.to_place_id, placeMap)}`,
-          `Horaire correspondant chez vous : ${targetTrip ? formatTripTimeRange(targetTrip) : '—'}`,
+          `Horaire de l’autre famille : ${targetTrip ? formatTripTimeRange(targetTrip) : '—'}`,
           ' ',
         ]
       })
@@ -531,7 +539,8 @@ export default async function handler(
               title: 'Informations générales',
               lines: [
                 `Nombre de trajets concernés : ${tripRows.length}`,
-                `Exclusivité jusqu’au : ${new Date(createdRequest.expires_at).toLocaleString('fr-FR')}`,
+                `Délai de priorité jusqu’au : ${new Date(createdRequest.expires_at).toLocaleString('fr-FR')}`,
+                `Pendant le délai de priorité (${getPriorityDelayText()}), une nouvelle demande ne peut pas être envoyée pour ce même trajet.`,
               ],
             },
             {

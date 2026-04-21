@@ -15,7 +15,6 @@ import {
   loadPlaceSuggestions,
   loadContactRequests,
 } from '../../lib/dashboardShared'
-import { supabase } from '../../lib/supabaseClient'
 import { trackEvent } from '../../lib/trackEvent'
 
 export default function DashboardHomePage() {
@@ -81,21 +80,16 @@ export default function DashboardHomePage() {
 
   const nextStep = useMemo(() => {
     if (children.length === 0) {
-      return 'Ajoutez au moins un enfant pour commencer.'
+      return 'Ajoutez au moins un enfant.'
     }
     if (trips.length === 0) {
       return 'Ajoutez votre premier trajet.'
     }
     if (readyTrips.length === 0) {
-      return 'Complétez ou corrigez un trajet pour qu’il soit pris en compte dans la recherche.'
+      return 'Complétez un trajet pour lancer la recherche.'
     }
-    return 'Vos informations sont prêtes. Vous pouvez lancer la recherche de correspondances.'
+    return 'Vos informations sont prêtes.'
   }, [children.length, trips.length, readyTrips.length])
-
-  async function handleLogout() {
-    await supabase.auth.signOut()
-    router.push('/login')
-  }
 
   if (loading) {
     return (
@@ -130,22 +124,16 @@ export default function DashboardHomePage() {
                 <Link href="/" className={styles.secondaryButton}>
                   Accueil
                 </Link>
-                <button onClick={handleLogout} className={styles.secondaryButton}>
-                  Se déconnecter
-                </button>
               </div>
             </div>
 
             {error ? <p className={styles.errorMessage}>{error}</p> : null}
 
             <div className={styles.heroCard}>
-              <h2 className={styles.heroTitle}>Recherche guidée</h2>
-              <p className={styles.heroText}>
-                Vérifiez vos enfants, vos trajets et lancez la recherche de familles compatibles.
-              </p>
+              <h2 className={styles.heroTitle}>Trouver une correspondance</h2>
               <div className={styles.heroActions}>
                 <Link href="/dashboard/find-match" className={styles.primaryButton}>
-                  Trouver une correspondance
+                  Lancer la recherche
                 </Link>
               </div>
             </div>
@@ -154,27 +142,21 @@ export default function DashboardHomePage() {
               <div className={styles.summaryCard}>
                 <p className={styles.summaryLabel}>Enfants</p>
                 <p className={styles.summaryValue}>{children.length}</p>
-                <p className={styles.summaryText}>Enfants enregistrés</p>
               </div>
 
               <div className={styles.summaryCard}>
                 <p className={styles.summaryLabel}>Trajets</p>
                 <p className={styles.summaryValue}>{trips.length}</p>
-                <p className={styles.summaryText}>
-                  {searchingTrips.length} en recherche · {readyTrips.length} prêts
-                </p>
               </div>
 
               <div className={styles.summaryCard}>
-                <p className={styles.summaryLabel}>Demandes</p>
+                <p className={styles.summaryLabel}>Demandes reçues</p>
                 <p className={styles.summaryValue}>{pendingReceived.length}</p>
-                <p className={styles.summaryText}>Demandes reçues en attente</p>
               </div>
 
               <div className={styles.summaryCard}>
-                <p className={styles.summaryLabel}>Lieux</p>
+                <p className={styles.summaryLabel}>Lieux à valider</p>
                 <p className={styles.summaryValue}>{pendingSuggestions.length}</p>
-                <p className={styles.summaryText}>Suggestions en attente</p>
               </div>
             </div>
 
@@ -190,18 +172,18 @@ export default function DashboardHomePage() {
                 <div className={styles.itemCard}>
                   <h3 className={styles.itemTitle}>Compte</h3>
                   <div className={styles.itemBody}>
-                    <p>Enfants enregistrés : {children.length}</p>
-                    <p>Trajets créés : {trips.length}</p>
-                    <p>Trajets prêts pour la recherche : {readyTrips.length}</p>
+                    <p>Enfants : {children.length}</p>
+                    <p>Trajets : {trips.length}</p>
+                    <p>Trajets prêts : {readyTrips.length}</p>
                   </div>
                 </div>
 
                 <div className={styles.itemCard}>
                   <h3 className={styles.itemTitle}>Demandes</h3>
                   <div className={styles.itemBody}>
-                    <p>Demandes reçues en attente : {pendingReceived.length}</p>
-                    <p>Demandes envoyées en attente : {pendingSent.length}</p>
-                    <p>Demandes acceptées / coordonnées partagées : {acceptedSent.length}</p>
+                    <p>Reçues en attente : {pendingReceived.length}</p>
+                    <p>Envoyées en attente : {pendingSent.length}</p>
+                    <p>Acceptées : {acceptedSent.length}</p>
                   </div>
                 </div>
               </div>
@@ -211,46 +193,76 @@ export default function DashboardHomePage() {
               <div className={styles.sectionHeader}>
                 <div>
                   <h2 className={styles.sectionTitle}>Gérer mes informations</h2>
-                  <p className={styles.sectionText}>
-                    Chaque page ci-dessous reste la source de vérité pour consulter et modifier vos
-                    données.
-                  </p>
                 </div>
               </div>
 
               <div className={styles.quickLinks}>
                 <Link href="/dashboard/profile" className={styles.quickLinkCard}>
-                  <h3 className={styles.quickLinkTitle}>Profil parent</h3>
-                  <p className={styles.quickLinkText}>Prénom, nom et téléphone.</p>
+                  <h3 className={styles.quickLinkTitle}>Parent</h3>
                 </Link>
 
                 <Link href="/dashboard/children" className={styles.quickLinkCard}>
                   <h3 className={styles.quickLinkTitle}>Enfants</h3>
-                  <p className={styles.quickLinkText}>Ajouter, consulter, supprimer.</p>
                 </Link>
 
                 <Link href="/dashboard/trips" className={styles.quickLinkCard}>
                   <h3 className={styles.quickLinkTitle}>Trajets</h3>
-                  <p className={styles.quickLinkText}>Créer, modifier, vérifier les statuts.</p>
                 </Link>
 
                 <Link href="/dashboard/requests" className={styles.quickLinkCard}>
                   <h3 className={styles.quickLinkTitle}>Demandes</h3>
-                  <p className={styles.quickLinkText}>Reçues, envoyées, réponses et clôtures.</p>
                 </Link>
 
                 <Link href="/dashboard/places" className={styles.quickLinkCard}>
                   <h3 className={styles.quickLinkTitle}>Lieux</h3>
-                  <p className={styles.quickLinkText}>Suggestions et suivi de validation.</p>
                 </Link>
 
                 <Link href="/dashboard/find-match" className={styles.quickLinkCard}>
-                  <h3 className={styles.quickLinkTitle}>Recherche guidée</h3>
-                  <p className={styles.quickLinkText}>
-                    Trouver une correspondance étape par étape.
-                  </p>
+                  <h3 className={styles.quickLinkTitle}>Recherche</h3>
                 </Link>
               </div>
+            </div>
+
+            <div className={styles.sectionCard}>
+              <div className={styles.sectionHeader}>
+                <div>
+                  <h2 className={styles.sectionTitle}>Recherche</h2>
+                </div>
+              </div>
+
+              <div className={styles.itemActions}>
+                <Link href="/dashboard/find-match" className={styles.primaryButton}>
+                  Trouver une correspondance
+                </Link>
+              </div>
+            </div>
+
+            <div className={styles.sectionCard}>
+              <div className={styles.sectionHeader}>
+                <div>
+                  <h2 className={styles.sectionTitle}>Raccourcis utiles</h2>
+                </div>
+              </div>
+
+              <div className={styles.itemActions}>
+                <Link href="/dashboard/children" className={styles.secondaryButton}>
+                  Enfants
+                </Link>
+                <Link href="/dashboard/trips" className={styles.secondaryButton}>
+                  Trajets
+                </Link>
+                <Link href="/dashboard/requests" className={styles.secondaryButton}>
+                  Demandes
+                </Link>
+                <Link href="/dashboard/places" className={styles.secondaryButton}>
+                  Lieux
+                </Link>
+              </div>
+            </div>
+
+            <div className={styles.statusMessage}>
+              Pour une demande déjà envoyée sur un même trajet, un nouveau contact ne sera possible
+              qu’après le délai de priorité.
             </div>
           </div>
         </section>
