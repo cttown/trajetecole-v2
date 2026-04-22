@@ -249,24 +249,16 @@ export default function DashboardPlacesPage({ setGlobalPopup }: Props) {
 
             {error ? <p className={styles.errorMessage}>{error}</p> : null}
 
-            <div className={styles.grid3}>
-              <div className={styles.summaryCard}>
-                <p className={styles.summaryLabel}>En attente</p>
-                <p className={styles.summaryValue}>{pendingCount}</p>
-              </div>
-
-              <div className={styles.summaryCard}>
-                <p className={styles.summaryLabel}>Validées</p>
-                <p className={styles.summaryValue}>{approvedCount}</p>
-              </div>
-
-              <div className={styles.summaryCard}>
-                <p className={styles.summaryLabel}>Rejetées</p>
-                <p className={styles.summaryValue}>{rejectedCount}</p>
-              </div>
-            </div>
-
             <div className={styles.sectionCard}>
+              <div className={styles.sectionHeader}>
+                <div>
+                  <h2 className={styles.sectionTitle}>Mes suggestions de lieux</h2>
+                  <p className={styles.itemMeta}>
+                    En attente : {pendingCount} · Validées : {approvedCount} · Rejetées : {rejectedCount}
+                  </p>
+                </div>
+              </div>
+
               <div className={styles.itemActions}>
                 <button
                   type="button"
@@ -359,19 +351,13 @@ export default function DashboardPlacesPage({ setGlobalPopup }: Props) {
                   </form>
                 </div>
               ) : null}
-            </div>
-
-            <div className={styles.sectionCard}>
-              <div className={styles.sectionHeader}>
-                <div>
-                  <h2 className={styles.sectionTitle}>Mes suggestions de lieux</h2>
-                </div>
-              </div>
 
               {suggestions.length === 0 ? (
-                <p className={styles.statusMessage}>Aucune suggestion envoyée.</p>
+                <p className={styles.statusMessage} style={{ marginTop: 18 }}>
+                  Aucune suggestion envoyée.
+                </p>
               ) : (
-                <div className={styles.itemList}>
+                <div className={styles.itemList} style={{ marginTop: 18 }}>
                   {suggestions.map((suggestion) => (
                     <div key={suggestion.id} className={styles.itemCard}>
                       <div className={styles.itemHeader}>

@@ -3,110 +3,88 @@ import { FormEvent, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '../lib/supabaseClient'
 import styles from '../styles/FormPages.module.css'
+import type { SetGlobalPopup } from './_app'
 
-export default function ForgotPasswordPage() {
+type Props = {
+  setGlobalPopup?: SetGlobalPopup
+}
+
+export default function ForgotPasswordPage({ setGlobalPopup }: Props) {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+
+  function showPopup(message: string, type: 'success' | 'error') {
+    if (setGlobalPopup) {
+      setGlobalPopup({ message, type })
+      return
+    }
+    if (type === 'error') setError(message)
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError('')
-    setSuccess('')
     setLoading(true)
 
-    try {
-      const redirectTo =
-        typeof window !== 'undefined'
-          ? `${window.location.origin}/reset-password`
-          : undefined
+    const redirectTo =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}/reset-password`
+        : undefined
 
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo,
-      })
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      email.trim().toLowerCase(),
+      { redirectTo }
+    )
 
-      if (error) {
-        throw error
-      }
+    setLoading(false)
 
-      setSuccess(
-        'Si cette adresse existe, un email de réinitialisation vient d’être envoyé.'
-      )
-      setEmail('')
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Erreur lors de l’envoi du lien de réinitialisation.'
-      )
-    } finally {
-      setLoading(false)
+    if (error) {
+      showPopup(error.message, 'error')
+      return
     }
+
+    showPopup(
+      'Un email de réinitialisation vient d’être envoyé. Pensez à vérifier aussi vos emails indésirables.',
+      'success'
+    )
   }
 
   return (
     <>
       <Head>
         <title>Mot de passe oublié - TrajetEcole</title>
-        <meta
-          name="description"
-          content="Demandez un lien de réinitialisation de mot de passe pour votre compte TrajetEcole."
-        />
       </Head>
 
       <main className={styles.page}>
         <section className={styles.section}>
-          <div className={styles.container}>
-            <div className={styles.formLayout}>
-              <div className={styles.sideCard}>
-                <div className={styles.badge}>Accès au compte</div>
-                <h1 className={styles.sideTitle}>Mot de passe oublié</h1>
-                <p className={styles.sideText}>
-                  Saisissez votre adresse email pour recevoir un lien de
-                  réinitialisation si elle correspond à un compte TrajetEcole.
-                </p>
+          <div className={styles.container} style={{ maxWidth: 760 }}>
+            <div className={styles.formCard}>
+              <h1 className={styles.formTitle}>Mot de passe oublié</h1>
 
-                <div className={styles.infoList}>
-                  <div className={styles.infoItem}>Lien envoyé par email</div>
-                  <div className={styles.infoItem}>Réinitialisation sécurisée</div>
-                  <div className={styles.infoItem}>Retour rapide à votre compte</div>
+              <form onSubmit={handleSubmit} className={styles.form}>
+                <div className={styles.field}>
+                  <label htmlFor="email">Email</label>
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
                 </div>
-              </div>
 
-              <div className={styles.formCard}>
-                <h2 className={styles.formTitle}>Recevoir un lien</h2>
-
-                <form onSubmit={handleSubmit} className={styles.form}>
-                  <div className={styles.field}>
-                    <label htmlFor="email">Email</label>
-                    <input
-                      id="email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className={styles.buttonRow}>
-                    <button type="submit" disabled={loading} className={styles.primaryButton}>
-                      {loading ? 'Envoi...' : 'Envoyer le lien'}
-                    </button>
-
-                    <Link href="/login" className={styles.secondaryButton}>
-                      Retour à la connexion
-                    </Link>
-                  </div>
-                </form>
+                <button type="submit" disabled={loading} className={styles.primaryButton}>
+                  {loading ? 'Envoi...' : 'Envoyer le lien'}
+                </button>
 
                 {error ? <p className={styles.errorMessage}>{error}</p> : null}
-                {success ? <p className={styles.successMessage}>{success}</p> : null}
+              </form>
 
-                <p className={styles.helperBlock}>
-                  Pensez à vérifier vos emails indésirables si vous ne voyez pas le message
-                  arriver rapidement.
-                </p>
+              <div className={styles.secondaryActions}>
+                <Link href="/login" className={styles.secondaryButton}>
+                  Retour à la connexion
+                </Link>
               </div>
             </div>
           </div>

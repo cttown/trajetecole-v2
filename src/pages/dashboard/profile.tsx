@@ -3,31 +3,60 @@ import Link from 'next/link'
 import { FormEvent, useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import styles from '../../styles/Dashboard.module.css'
-import { Family, requireFamily } from '../../lib/dashboardShared'
+import { requireFamily } from '../../lib/dashboardShared'
 import { supabase } from '../../lib/supabaseClient'
+import type { SetGlobalPopup } from '../_app'
 
-export default function DashboardProfilePage() {
+type Props = {
+  setGlobalPopup?: SetGlobalPopup
+}
+
+const PHONE_REGEX = /^[+()\-\s0-9]{8,20}$/
+
+function validatePhone(value: string) {
+  const trimmed = value.trim()
+
+  if (!trimmed) {
+    return 'Le numéro de téléphone est obligatoire.'
+  }
+
+  if (!PHONE_REGEX.test(trimmed)) {
+    return 'Le format du numéro semble incorrect.'
+  }
+
+  return ''
+}
+
+export default function DashboardProfilePage({ setGlobalPopup }: Props) {
   const router = useRouter()
 
-  const [family, setFamily] = useState<Family | null>(null)
+  const [familyId, setFamilyId] = useState('')
   const [parentFirstName, setParentFirstName] = useState('')
   const [parentLastName, setParentLastName] = useState('')
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const [phoneError, setPhoneError] = useState('')
+
+  function showPopup(message: string, type: 'success' | 'error' = 'success') {
+    if (setGlobalPopup) {
+      setGlobalPopup({ message, type })
+      return
+    }
+    if (type === 'error') setError(message)
+  }
 
   useEffect(() => {
     async function loadPage() {
       try {
-        const result = await requireFamily(router)
-        if (!result.family) return
+        const { family } = await requireFamily(router)
+        if (!family) return
 
-        setFamily(result.family)
-        setParentFirstName(result.family.parent_first_name ?? '')
-        setParentLastName(result.family.parent_last_name ?? '')
-        setPhone(result.family.phone ?? '')
+        setFamilyId(family.id)
+        setParentFirstName(family.parent_first_name || '')
+        setParentLastName(family.parent_last_name || '')
+        setPhone(family.phone || '')
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erreur de chargement.')
       } finally {
@@ -38,34 +67,34 @@ export default function DashboardProfilePage() {
     loadPage()
   }, [router])
 
-  async function handleSave(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!family) return
-
     setError('')
-    setSuccess('')
+
+    const phoneMessage = validatePhone(phone)
+    setPhoneError(phoneMessage)
+
+    if (phoneMessage) return
+
     setSaving(true)
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('families')
       .update({
-        parent_first_name: parentFirstName.trim(),
-        parent_last_name: parentLastName.trim(),
-        phone: phone.trim() || null,
+        parent_first_name: parentFirstName.trim() || null,
+        parent_last_name: parentLastName.trim() || null,
+        phone: phone.trim(),
       })
-      .eq('id', family.id)
-      .select()
-      .single()
+      .eq('id', familyId)
 
     setSaving(false)
 
     if (error) {
-      setError(error.message)
+      showPopup(error.message, 'error')
       return
     }
 
-    setFamily(data)
-    setSuccess('Profil mis à jour.')
+    showPopup('Informations mises à jour.', 'success')
   }
 
   if (loading) {
@@ -83,7 +112,7 @@ export default function DashboardProfilePage() {
   return (
     <>
       <Head>
-        <title>Profil parent - TrajetEcole</title>
+        <title>Parent - TrajetEcole</title>
       </Head>
 
       <main className={styles.page}>
@@ -91,18 +120,20 @@ export default function DashboardProfilePage() {
           <div className={styles.container}>
             <div className={styles.topbar}>
               <div>
-                <h1 className={styles.pageTitle}>Profil parent</h1>
-                <p className={styles.pageIntro}>Informations du parent responsable.</p>
+                <h1 className={styles.pageTitle}>Parent</h1>
               </div>
+
               <div className={styles.topbarActions}>
                 <Link href="/dashboard" className={styles.secondaryButton}>
-                  Retour dashboard
+                  Retour Mon espace
                 </Link>
               </div>
             </div>
 
+            {error ? <p className={styles.errorMessage}>{error}</p> : null}
+
             <div className={styles.sectionCard}>
-              <form onSubmit={handleSave} className={styles.form}>
+              <form onSubmit={handleSubmit} className={styles.form}>
                 <div className={styles.fieldRow}>
                   <div className={styles.field}>
                     <label htmlFor="parentFirstName">Prénom</label>
@@ -110,7 +141,6 @@ export default function DashboardProfilePage() {
                       id="parentFirstName"
                       value={parentFirstName}
                       onChange={(e) => setParentFirstName(e.target.value)}
-                      required
                     />
                   </div>
 
@@ -120,7 +150,6 @@ export default function DashboardProfilePage() {
                       id="parentLastName"
                       value={parentLastName}
                       onChange={(e) => setParentLastName(e.target.value)}
-                      required
                     />
                   </div>
                 </div>
@@ -131,19 +160,18 @@ export default function DashboardProfilePage() {
                     id="phone"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="Optionnel"
+                    onBlur={() => setPhoneError(validatePhone(phone))}
+                    required
                   />
+                  {phoneError ? <p className={styles.fieldError}>{phoneError}</p> : null}
                 </div>
 
                 <div className={styles.itemActions}>
-                  <button className={styles.primaryButton} disabled={saving}>
-                    {saving ? 'Enregistrement...' : 'Enregistrer le profil'}
+                  <button type="submit" className={styles.primaryButton} disabled={saving}>
+                    {saving ? 'Enregistrement...' : 'Enregistrer'}
                   </button>
                 </div>
               </form>
-
-              {error ? <p className={styles.errorMessage}>{error}</p> : null}
-              {success ? <p className={styles.successMessage}>{success}</p> : null}
             </div>
           </div>
         </section>

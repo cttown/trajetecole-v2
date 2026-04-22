@@ -18,6 +18,9 @@ export default function DashboardChildrenPage({ setGlobalPopup }: Props) {
   const [children, setChildren] = useState<Child[]>([])
   const [childFirstName, setChildFirstName] = useState('')
   const [childLevel, setChildLevel] = useState('')
+  const [editingChildId, setEditingChildId] = useState<string | null>(null)
+  const [editingFirstName, setEditingFirstName] = useState('')
+  const [editingLevel, setEditingLevel] = useState('')
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -28,10 +31,7 @@ export default function DashboardChildrenPage({ setGlobalPopup }: Props) {
       setGlobalPopup({ message, type })
       return
     }
-
-    if (type === 'error') {
-      setError(message)
-    }
+    if (type === 'error') setError(message)
   }
 
   useEffect(() => {
@@ -52,6 +52,11 @@ export default function DashboardChildrenPage({ setGlobalPopup }: Props) {
     loadPage()
   }, [router])
 
+  async function reloadChildren() {
+    if (!familyId) return
+    setChildren(await loadChildren(familyId))
+  }
+
   async function handleAddChild(e: FormEvent) {
     e.preventDefault()
     setError('')
@@ -64,15 +69,11 @@ export default function DashboardChildrenPage({ setGlobalPopup }: Props) {
 
     setSaving(true)
 
-    const { data, error } = await supabase
-      .from('children')
-      .insert({
-        family_id: familyId,
-        first_name: childFirstName.trim(),
-        level: childLevel.trim() || null,
-      })
-      .select()
-      .single()
+    const { error } = await supabase.from('children').insert({
+      family_id: familyId,
+      first_name: childFirstName.trim(),
+      level: childLevel.trim() || null,
+    })
 
     setSaving(false)
 
@@ -81,10 +82,50 @@ export default function DashboardChildrenPage({ setGlobalPopup }: Props) {
       return
     }
 
-    setChildren((prev) => [...prev, data])
     setChildFirstName('')
     setChildLevel('')
+    await reloadChildren()
     showPopup('Enfant ajouté.', 'success')
+  }
+
+  function openEdit(child: Child) {
+    setEditingChildId(child.id)
+    setEditingFirstName(child.first_name)
+    setEditingLevel(child.level || '')
+  }
+
+  async function handleUpdateChild(e: FormEvent) {
+    e.preventDefault()
+    setError('')
+
+    if (!editingChildId) return
+    if (!editingFirstName.trim()) {
+      showPopup('Le prénom de l’enfant est obligatoire.', 'error')
+      return
+    }
+
+    setSaving(true)
+
+    const { error } = await supabase
+      .from('children')
+      .update({
+        first_name: editingFirstName.trim(),
+        level: editingLevel.trim() || null,
+      })
+      .eq('id', editingChildId)
+
+    setSaving(false)
+
+    if (error) {
+      showPopup(error.message, 'error')
+      return
+    }
+
+    setEditingChildId(null)
+    setEditingFirstName('')
+    setEditingLevel('')
+    await reloadChildren()
+    showPopup('Enfant modifié.', 'success')
   }
 
   async function handleDeleteChild(childId: string) {
@@ -100,7 +141,7 @@ export default function DashboardChildrenPage({ setGlobalPopup }: Props) {
       return
     }
 
-    setChildren((prev) => prev.filter((child) => child.id !== childId))
+    await reloadChildren()
     showPopup('Enfant supprimé.', 'success')
   }
 
@@ -139,13 +180,13 @@ export default function DashboardChildrenPage({ setGlobalPopup }: Props) {
             {error ? <p className={styles.errorMessage}>{error}</p> : null}
 
             <div className={styles.sectionCard}>
-              <div className={styles.sectionHeader}>
-                <div>
-                  <h2 className={styles.sectionTitle}>Ajouter un enfant</h2>
-                </div>
-              </div>
-
               <form onSubmit={handleAddChild} className={styles.form}>
+                <div className={styles.itemActions}>
+                  <button type="submit" className={styles.primaryButton} disabled={saving}>
+                    {saving ? 'Ajout...' : 'Ajouter un enfant'}
+                  </button>
+                </div>
+
                 <div className={styles.fieldRow}>
                   <div className={styles.field}>
                     <label htmlFor="childFirstName">Prénom</label>
@@ -166,12 +207,6 @@ export default function DashboardChildrenPage({ setGlobalPopup }: Props) {
                       placeholder="Ex : CE2, 6e, CM1..."
                     />
                   </div>
-                </div>
-
-                <div className={styles.itemActions}>
-                  <button className={styles.primaryButton} disabled={saving}>
-                    {saving ? 'Ajout...' : 'Ajouter un enfant'}
-                  </button>
                 </div>
               </form>
             </div>
@@ -199,6 +234,14 @@ export default function DashboardChildrenPage({ setGlobalPopup }: Props) {
                       <div className={styles.itemActions}>
                         <button
                           type="button"
+                          className={styles.secondaryButton}
+                          onClick={() => openEdit(child)}
+                        >
+                          Modifier
+                        </button>
+
+                        <button
+                          type="button"
                           className={styles.dangerButton}
                           onClick={() => handleDeleteChild(child.id)}
                           disabled={deletingId === child.id}
@@ -206,6 +249,41 @@ export default function DashboardChildrenPage({ setGlobalPopup }: Props) {
                           {deletingId === child.id ? 'Suppression...' : 'Supprimer'}
                         </button>
                       </div>
+
+                      {editingChildId === child.id ? (
+                        <form onSubmit={handleUpdateChild} className={styles.form} style={{ marginTop: 16 }}>
+                          <div className={styles.fieldRow}>
+                            <div className={styles.field}>
+                              <label>Prénom</label>
+                              <input
+                                value={editingFirstName}
+                                onChange={(e) => setEditingFirstName(e.target.value)}
+                              />
+                            </div>
+
+                            <div className={styles.field}>
+                              <label>Niveau / classe</label>
+                              <input
+                                value={editingLevel}
+                                onChange={(e) => setEditingLevel(e.target.value)}
+                              />
+                            </div>
+                          </div>
+
+                          <div className={styles.itemActions}>
+                            <button type="submit" className={styles.primaryButton} disabled={saving}>
+                              {saving ? 'Enregistrement...' : 'Enregistrer'}
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.secondaryButton}
+                              onClick={() => setEditingChildId(null)}
+                            >
+                              Annuler
+                            </button>
+                          </div>
+                        </form>
+                      ) : null}
                     </div>
                   ))}
                 </div>

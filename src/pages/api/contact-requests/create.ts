@@ -22,26 +22,12 @@ type TripRow = {
   child_id: string
   from_place_id: string | null
   to_place_id: string | null
-  from_place_suggestion_id: string | null
-  to_place_suggestion_id: string | null
   day_of_week: number
   from_time: string
   to_time: string | null
   tolerance_min: number
   status: 'searching' | 'resolved_open' | 'resolved' | 'archived'
-  revision: number
-  created_at: string
   trip_group_id: string
-}
-
-type ContactRequestRow = {
-  id: string
-  requester_family_id: string
-  target_family_id: string
-  status: 'pending' | 'accepted' | 'declined' | 'expired' | 'cancelled'
-  created_at: string
-  expires_at: string
-  accepted_at: string | null
 }
 
 type FamilyRow = {
@@ -79,56 +65,38 @@ function displayParentName(family: FamilyRow) {
   return full || family.email
 }
 
-function isTripEligibleForNeed(trip: TripRow): boolean {
-  return (
-    trip.status === 'searching' &&
-    !!trip.from_place_id &&
-    !!trip.to_place_id &&
-    !trip.from_place_suggestion_id &&
-    !trip.to_place_suggestion_id
-  )
-}
-
-function isTripEligibleAsOffer(trip: TripRow): boolean {
-  return (
-    (trip.status === 'searching' || trip.status === 'resolved_open') &&
-    !!trip.from_place_id &&
-    !!trip.to_place_id &&
-    !trip.from_place_suggestion_id &&
-    !trip.to_place_suggestion_id
-  )
-}
-
 function timeToMinutes(value: string | null): number | null {
   if (!value) return null
-
   const [hours, minutes] = value.split(':').map(Number)
-
   if (Number.isNaN(hours) || Number.isNaN(minutes)) return null
-
   return hours * 60 + minutes
 }
 
-function areTripsCompatible(requesterTrip: TripRow, targetTrip: TripRow): boolean {
-  if (requesterTrip.family_id === targetTrip.family_id) return false
-  if (!isTripEligibleForNeed(requesterTrip) || !isTripEligibleAsOffer(targetTrip)) return false
+function isRequesterTripEligible(trip: TripRow) {
+  return trip.status === 'searching' && !!trip.from_place_id && !!trip.to_place_id
+}
 
+function isTargetTripEligible(trip: TripRow) {
+  return (
+    (trip.status === 'searching' || trip.status === 'resolved_open') &&
+    !!trip.from_place_id &&
+    !!trip.to_place_id
+  )
+}
+
+function areTripsCompatible(requesterTrip: TripRow, targetTrip: TripRow) {
   if (requesterTrip.day_of_week !== targetTrip.day_of_week) return false
   if (requesterTrip.from_place_id !== targetTrip.from_place_id) return false
   if (requesterTrip.to_place_id !== targetTrip.to_place_id) return false
 
   const requesterMin = timeToMinutes(requesterTrip.from_time)
   const targetMin = timeToMinutes(targetTrip.from_time)
-
   if (requesterMin === null || targetMin === null) return false
 
-  const timeDiffMin = Math.abs(requesterMin - targetMin)
-  const allowedDiffMin = Math.min(
-    requesterTrip.tolerance_min ?? 0,
-    targetTrip.tolerance_min ?? 0
-  )
+  const diff = Math.abs(requesterMin - targetMin)
+  const allowed = Math.min(requesterTrip.tolerance_min ?? 0, targetTrip.tolerance_min ?? 0)
 
-  return timeDiffMin <= allowedDiffMin
+  return diff <= allowed
 }
 
 function formatDay(dayOfWeek: number) {
@@ -148,12 +116,6 @@ function formatDay(dayOfWeek: number) {
 function formatTimeValue(value: string | null) {
   if (!value) return '—'
   return value.slice(0, 5)
-}
-
-function formatTripTimeRange(trip: TripRow) {
-  return trip.to_time
-    ? `${formatTimeValue(trip.from_time)} → ${formatTimeValue(trip.to_time)}`
-    : formatTimeValue(trip.from_time)
 }
 
 function formatPlace(placeId: string | null, placeMap: Record<string, PlaceRow>) {
@@ -234,23 +196,7 @@ export default async function handler(
 
     const { data: requesterTripsData, error: requesterTripsError } = await supabaseAdmin
       .from('trips')
-      .select(`
-        id,
-        family_id,
-        child_id,
-        from_place_id,
-        to_place_id,
-        from_place_suggestion_id,
-        to_place_suggestion_id,
-        day_of_week,
-        from_time,
-        to_time,
-        tolerance_min,
-        status,
-        revision,
-        created_at,
-        trip_group_id
-      `)
+      .select('id, family_id, child_id, from_place_id, to_place_id, day_of_week, from_time, to_time, tolerance_min, status, trip_group_id')
       .in('id', requesterTripIds)
 
     if (requesterTripsError) {
@@ -264,7 +210,7 @@ export default async function handler(
     }
 
     const invalidRequesterTrip = requesterTrips.find(
-      (trip) => trip.family_id !== requesterFamily.id || !isTripEligibleForNeed(trip)
+      (trip) => trip.family_id !== requesterFamily.id || !isRequesterTripEligible(trip)
     )
 
     if (invalidRequesterTrip) {
@@ -309,23 +255,7 @@ export default async function handler(
 
     const { data: targetTripsData, error: targetTripsError } = await supabaseAdmin
       .from('trips')
-      .select(`
-        id,
-        family_id,
-        child_id,
-        from_place_id,
-        to_place_id,
-        from_place_suggestion_id,
-        to_place_suggestion_id,
-        day_of_week,
-        from_time,
-        to_time,
-        tolerance_min,
-        status,
-        revision,
-        created_at,
-        trip_group_id
-      `)
+      .select('id, family_id, child_id, from_place_id, to_place_id, day_of_week, from_time, to_time, tolerance_min, status, trip_group_id')
       .eq('family_id', targetFamilyId)
       .in('status', ['searching', 'resolved_open'])
 
@@ -333,7 +263,7 @@ export default async function handler(
       return res.status(500).json({ error: targetTripsError.message })
     }
 
-    const targetTrips = ((targetTripsData ?? []) as TripRow[]).filter(isTripEligibleAsOffer)
+    const targetTrips = ((targetTripsData ?? []) as TripRow[]).filter(isTargetTripEligible)
 
     const matchedPairs: { requester_trip_id: string; target_trip_id: string }[] = []
 
@@ -348,14 +278,6 @@ export default async function handler(
           code: 'NO_LONGER_COMPATIBLE',
         })
       }
-
-      compatibleTargetTrips.sort((a, b) => {
-        const aDiff =
-          Math.abs((timeToMinutes(requesterTrip.from_time) ?? 0) - (timeToMinutes(a.from_time) ?? 0))
-        const bDiff =
-          Math.abs((timeToMinutes(requesterTrip.from_time) ?? 0) - (timeToMinutes(b.from_time) ?? 0))
-        return aDiff - bDiff
-      })
 
       matchedPairs.push({
         requester_trip_id: requesterTrip.id,
@@ -375,7 +297,7 @@ export default async function handler(
         status: 'pending',
         expires_at: expiresAt,
       })
-      .select('id, requester_family_id, target_family_id, status, created_at, expires_at, accepted_at')
+      .select('id, requester_family_id, target_family_id, status, created_at, expires_at')
       .single()
 
     if (createRequestError || !createdRequest) {
@@ -395,10 +317,7 @@ export default async function handler(
       .insert(tripRows)
 
     if (createTripRowsError) {
-      await supabaseAdmin
-        .from('contact_requests')
-        .delete()
-        .eq('id', createdRequest.id)
+      await supabaseAdmin.from('contact_requests').delete().eq('id', createdRequest.id)
 
       return res.status(500).json({
         error: createTripRowsError.message,
@@ -435,21 +354,22 @@ export default async function handler(
       )
       const targetTripMap = Object.fromEntries(targetTrips.map((trip) => [trip.id, trip]))
 
-      const tripLines = matchedPairs.flatMap((pair, index) => {
+      const tripSections = matchedPairs.map((pair, index) => {
         const requesterTrip = requesterTrips.find((trip) => trip.id === pair.requester_trip_id)!
         const targetTrip = targetTripMap[pair.target_trip_id]
         const child = childMap[requesterTrip.child_id]
 
-        return [
-          `Trajet ${index + 1}`,
-          `Enfant : ${child?.first_name || '—'}`,
-          `Jour : ${formatDay(requesterTrip.day_of_week)}`,
-          `Votre horaire : ${formatTripTimeRange(requesterTrip)}`,
-          `Départ : ${formatPlace(requesterTrip.from_place_id, placeMap)}`,
-          `Arrivée : ${formatPlace(requesterTrip.to_place_id, placeMap)}`,
-          `Horaire de l’autre famille : ${targetTrip ? formatTripTimeRange(targetTrip) : '—'}`,
-          ' ',
-        ]
+        return {
+          title: `Trajet ${index + 1}`,
+          lines: [
+            `Enfant : ${child?.first_name || '—'}`,
+            `Jour : ${formatDay(requesterTrip.day_of_week)}`,
+            `Votre horaire : ${formatTimeValue(requesterTrip.from_time)}`,
+            `Départ : ${formatPlace(requesterTrip.from_place_id, placeMap)}`,
+            `Destination : ${formatPlace(requesterTrip.to_place_id, placeMap)}`,
+            `Horaire de l’autre famille : ${targetTrip ? formatTimeValue(targetTrip.from_time) : '—'}`,
+          ],
+        }
       })
 
       const appBaseUrl = getAppBaseUrl()
@@ -473,7 +393,9 @@ export default async function handler(
         subject: 'Nouvelle demande de mise en relation sur TrajetEcole',
         html: buildEmailLayout({
           title: 'Nouvelle demande de mise en relation',
-          intro: `${displayParentName(requesterFamily as FamilyRow)} souhaite entrer en contact avec vous sur TrajetEcole.`,
+          intro: `Bonjour ${displayParentName(targetFamily as FamilyRow)}, ${displayParentName(
+            requesterFamily as FamilyRow
+          )} souhaite entrer en contact avec vous via TrajetEcole.`,
           sections: [
             {
               title: 'Informations générales',
@@ -488,9 +410,12 @@ export default async function handler(
                 })}`,
               ],
             },
+            ...tripSections,
             {
-              title: 'Détail des trajets concernés',
-              lines: tripLines,
+              title: 'Que faire maintenant ?',
+              lines: [
+                'Vous pouvez répondre directement depuis cet email, ou retrouver cette demande dans votre espace TrajetEcole.',
+              ],
             },
           ],
           buttons: [
@@ -515,7 +440,7 @@ export default async function handler(
             },
           ],
           footerNote:
-            'Vous pouvez répondre directement depuis cet email ou retrouver cette demande dans votre espace TrajetEcole.',
+            'Merci pour votre réponse. Elle aidera à organiser plus facilement les trajets entre familles.',
         }),
       })
     } catch (emailError) {
@@ -523,7 +448,7 @@ export default async function handler(
     }
 
     return res.status(200).json({
-      request: createdRequest as ContactRequestRow,
+      request: createdRequest,
       linked_trip_count: tripRows.length,
     })
   } catch (error) {

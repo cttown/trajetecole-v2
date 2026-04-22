@@ -10,17 +10,8 @@ type ContactRequestRow = {
   id: string
   requester_family_id: string
   target_family_id: string
-  status:
-    | 'pending'
-    | 'accepted'
-    | 'declined'
-    | 'expired'
-    | 'cancelled'
-    | 'closed_no_agreement'
-    | 'closed_with_agreement'
-  created_at: string
+  status: 'pending' | 'accepted' | 'declined' | 'expired' | 'cancelled'
   expires_at: string
-  accepted_at: string | null
 }
 
 type FamilyRow = {
@@ -28,7 +19,6 @@ type FamilyRow = {
   parent_first_name: string | null
   parent_last_name: string | null
   email: string
-  phone?: string | null
 }
 
 function requireEnv(name: string): string {
@@ -48,29 +38,17 @@ function displayParentName(family: FamilyRow) {
   return full || family.email
 }
 
-function redirectToDashboard(
-  res: NextApiResponse,
-  status: 'accepted' | 'declined' | 'already_done' | 'error'
-) {
-  const appBaseUrl = getAppBaseUrl()
-  res.redirect(`${appBaseUrl}/dashboard?contact_request_email_action=${status}`)
-}
-
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' })
+  const token = String(req.query.token || '')
+
+  if (!token) {
+    return res.status(400).send('Lien invalide.')
   }
 
   try {
-    const token = typeof req.query.token === 'string' ? req.query.token : ''
-
-    if (!token) {
-      return redirectToDashboard(res, 'error')
-    }
-
     const payload = verifyContactRequestEmailActionToken(token)
 
     const supabaseUrl = requireEnv('NEXT_PUBLIC_SUPABASE_URL')
@@ -79,92 +57,86 @@ export default async function handler(
 
     const { data: requestData, error: requestError } = await supabaseAdmin
       .from('contact_requests')
-      .select('id, requester_family_id, target_family_id, status, created_at, expires_at, accepted_at')
+      .select('id, requester_family_id, target_family_id, status, expires_at')
       .eq('id', payload.requestId)
       .single()
 
     if (requestError || !requestData) {
-      return redirectToDashboard(res, 'error')
+      return res.status(404).send('Demande introuvable.')
     }
 
     const requestRow = requestData as ContactRequestRow
 
     if (requestRow.target_family_id !== payload.targetFamilyId) {
-      return redirectToDashboard(res, 'error')
+      return res.status(403).send('Action non autorisée.')
     }
 
     if (requestRow.status !== 'pending') {
-      return redirectToDashboard(res, 'already_done')
+      return res.redirect(`${getAppBaseUrl()}/login`)
+    }
+
+    if (new Date(requestRow.expires_at).getTime() < Date.now()) {
+      await supabaseAdmin
+        .from('contact_requests')
+        .update({
+          status: 'expired',
+        })
+        .eq('id', requestRow.id)
+
+      return res.send('Cette demande a expiré.')
     }
 
     const { data: requesterFamily, error: requesterFamilyError } = await supabaseAdmin
       .from('families')
-      .select('id, parent_first_name, parent_last_name, email, phone')
+      .select('id, parent_first_name, parent_last_name, email')
       .eq('id', requestRow.requester_family_id)
       .single()
 
     const { data: targetFamily, error: targetFamilyError } = await supabaseAdmin
       .from('families')
-      .select('id, parent_first_name, parent_last_name, email, phone')
+      .select('id, parent_first_name, parent_last_name, email')
       .eq('id', requestRow.target_family_id)
       .single()
 
     if (requesterFamilyError || !requesterFamily || targetFamilyError || !targetFamily) {
-      return redirectToDashboard(res, 'error')
+      return res.status(404).send('Famille introuvable.')
     }
 
     const nowIso = new Date().toISOString()
+    const appBaseUrl = getAppBaseUrl()
 
-    const nextStatus = payload.action === 'accept' ? 'accepted' : 'declined'
+    if (payload.action === 'accept') {
+      const { error: updateError } = await supabaseAdmin
+        .from('contact_requests')
+        .update({
+          status: 'accepted',
+          responded_at: nowIso,
+          accepted_at: nowIso,
+        })
+        .eq('id', requestRow.id)
 
-    const updatePayload =
-      payload.action === 'accept'
-        ? {
-            status: nextStatus,
-            responded_at: nowIso,
-            accepted_at: nowIso,
-          }
-        : {
-            status: nextStatus,
-            responded_at: nowIso,
-            close_reason: 'Declined by target family via email',
-          }
+      if (updateError) {
+        return res.status(500).send(updateError.message)
+      }
 
-    const { error: updateError } = await supabaseAdmin
-      .from('contact_requests')
-      .update(updatePayload)
-      .eq('id', requestRow.id)
-
-    if (updateError) {
-      return redirectToDashboard(res, 'error')
-    }
-
-    try {
-      const appBaseUrl = getAppBaseUrl()
-
-      if (payload.action === 'accept') {
+      try {
         await sendEmail({
           to: requesterFamily.email,
           subject: 'Votre demande a été acceptée sur TrajetEcole',
           html: buildEmailLayout({
             title: 'Demande acceptée',
-            intro: `Bonne nouvelle : ${displayParentName(
+            intro: `${displayParentName(
               targetFamily as FamilyRow
             )} a accepté votre demande de mise en relation.`,
             sections: [
               {
-                title: 'Coordonnées partagées',
-                lines: [
-                  `Parent : ${displayParentName(targetFamily as FamilyRow)}`,
-                  `Email : ${targetFamily.email}`,
-                  ...(targetFamily.phone ? [`Téléphone : ${targetFamily.phone}`] : []),
-                ],
+                title: 'Coordonnées',
+                lines: [`Email : ${targetFamily.email}`],
               },
               {
-                title: 'Prochaine étape',
+                title: 'Suite',
                 lines: [
-                  'Vous pouvez maintenant contacter cet autre parent pour organiser le trajet ensemble.',
-                  'Nous vous conseillons de prendre contact rapidement afin de définir l’organisation la plus adaptée pour vos enfants.',
+                  'Vous pouvez maintenant contacter ce parent pour échanger directement.',
                 ],
               },
             ],
@@ -176,45 +148,64 @@ export default async function handler(
               },
             ],
             footerNote:
-              'Les coordonnées et le statut à jour sont également disponibles dans votre espace TrajetEcole.',
+              'Les informations à jour restent disponibles dans votre espace TrajetEcole.',
           }),
         })
-      } else {
-        await sendEmail({
-          to: requesterFamily.email,
-          subject: 'Votre demande a été refusée sur TrajetEcole',
-          html: buildEmailLayout({
-            title: 'Demande refusée',
-            intro: `${displayParentName(
-              targetFamily as FamilyRow
-            )} a refusé votre demande de mise en relation.`,
-            sections: [
-              {
-                title: 'Suite possible',
-                lines: [
-                  'Vous pouvez poursuivre votre recherche et contacter une autre famille compatible depuis votre espace TrajetEcole.',
-                ],
-              },
-            ],
-            buttons: [
-              {
-                label: 'Voir mon espace',
-                url: `${appBaseUrl}/dashboard`,
-                kind: 'primary',
-              },
-            ],
-            footerNote:
-              'Les informations à jour sont visibles dans votre espace TrajetEcole.',
-          }),
-        })
+      } catch (emailError) {
+        console.error('Failed to send acceptance email:', emailError)
       }
-    } catch (emailError) {
-      console.error('Failed to send response email from email action:', emailError)
+
+      return res.send('Demande acceptée. Vous pouvez fermer cette page.')
     }
 
-    return redirectToDashboard(res, payload.action === 'accept' ? 'accepted' : 'declined')
+    const { error: updateError } = await supabaseAdmin
+      .from('contact_requests')
+      .update({
+        status: 'declined',
+        responded_at: nowIso,
+      })
+      .eq('id', requestRow.id)
+
+    if (updateError) {
+      return res.status(500).send(updateError.message)
+    }
+
+    try {
+      await sendEmail({
+        to: requesterFamily.email,
+        subject: 'Votre demande a été refusée sur TrajetEcole',
+        html: buildEmailLayout({
+          title: 'Demande refusée',
+          intro: `${displayParentName(
+            targetFamily as FamilyRow
+          )} n’a pas donné suite à votre demande de mise en relation.`,
+          sections: [
+            {
+              title: 'Suite',
+              lines: [
+                'Vous pouvez relancer une recherche ou contacter une autre famille compatible.',
+              ],
+            },
+          ],
+          buttons: [
+            {
+              label: 'Voir mon espace',
+              url: `${appBaseUrl}/dashboard`,
+              kind: 'primary',
+            },
+          ],
+          footerNote:
+            'Les informations à jour restent disponibles dans votre espace TrajetEcole.',
+        }),
+      })
+    } catch (emailError) {
+      console.error('Failed to send decline email:', emailError)
+    }
+
+    return res.send('Demande refusée. Vous pouvez fermer cette page.')
   } catch (error) {
-    console.error('Email action failed:', error)
-    return redirectToDashboard(res, 'error')
+    return res.status(400).send(
+      error instanceof Error ? error.message : 'Lien invalide.'
+    )
   }
 }

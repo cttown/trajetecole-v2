@@ -8,7 +8,6 @@ import {
   FamilyMatch,
   Trip,
   createContactRequest,
-  formatDayValues,
   formatSingleDay,
   formatTimeValue,
   loadChildren,
@@ -28,6 +27,22 @@ type Props = {
   setGlobalPopup?: SetGlobalPopup
 }
 
+type SearchPlaceResult = {
+  id: string
+  name: string
+  city: string
+}
+
+const DAY_OPTIONS = [
+  { value: 1, label: 'Lundi' },
+  { value: 2, label: 'Mardi' },
+  { value: 3, label: 'Mercredi' },
+  { value: 4, label: 'Jeudi' },
+  { value: 5, label: 'Vendredi' },
+  { value: 6, label: 'Samedi' },
+  { value: 7, label: 'Dimanche' },
+]
+
 export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
   const router = useRouter()
 
@@ -46,11 +61,33 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
   const [selectedChildId, setSelectedChildId] = useState('')
   const [selectedTripIds, setSelectedTripIds] = useState<string[]>([])
   const [showAddChild, setShowAddChild] = useState(false)
-  const [showHelpText, setShowHelpText] = useState(false)
+  const [showAddTrip, setShowAddTrip] = useState(false)
 
   const [childFirstName, setChildFirstName] = useState('')
   const [childLevel, setChildLevel] = useState('')
   const [savingChild, setSavingChild] = useState(false)
+
+  const [fromPlaceQuery, setFromPlaceQuery] = useState('')
+  const [toPlaceQuery, setToPlaceQuery] = useState('')
+  const [fromPlaceId, setFromPlaceId] = useState('')
+  const [toPlaceId, setToPlaceId] = useState('')
+  const [fromResults, setFromResults] = useState<SearchPlaceResult[]>([])
+  const [toResults, setToResults] = useState<SearchPlaceResult[]>([])
+  const [selectedDays, setSelectedDays] = useState<number[]>([])
+  const [fromTime, setFromTime] = useState('')
+  const [toleranceMin, setToleranceMin] = useState('10')
+  const [savingTrip, setSavingTrip] = useState(false)
+
+  function showPopup(message: string, type: 'success' | 'error' = 'success') {
+    if (setGlobalPopup) {
+      setGlobalPopup({ message, type })
+      return
+    }
+
+    if (type === 'error') {
+      setError(message)
+    }
+  }
 
   useEffect(() => {
     trackEvent({
@@ -89,58 +126,61 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
     loadPage()
   }, [router])
 
-  const placeMap = useMemo(
-    () => Object.fromEntries(places.map((place) => [place.id, place])),
-    [places]
-  )
-
-  const suggestionMap = useMemo(
-    () => Object.fromEntries(placeSuggestions.map((item) => [item.id, item])),
-    [placeSuggestions]
-  )
-
   const selectedChildTrips = useMemo(() => {
     if (!selectedChildId) return []
     return trips.filter((trip) => trip.child_id === selectedChildId && trip.status === 'searching')
   }, [selectedChildId, trips])
 
-  function showPopup(message: string, type: 'success' | 'error' = 'success') {
-    if (setGlobalPopup) {
-      setGlobalPopup({ message, type })
-      return
-    }
-
-    if (type === 'error') {
-      setError(message)
-    }
+  async function reloadChildren() {
+    if (!familyId) return
+    setChildren(await loadChildren(familyId))
   }
 
-  function placeLabel(placeId: string | null, suggestionId?: string | null) {
-    if (placeId) {
-      const place = placeMap[placeId]
-      return place ? `${place.name} (${place.city})` : 'Lieu inconnu'
-    }
-
-    if (suggestionId) {
-      const suggestion = suggestionMap[suggestionId]
-      return suggestion
-        ? `${suggestion.suggested_name} (suggestion en attente)`
-        : 'Suggestion inconnue'
-    }
-
-    return 'Lieu non renseigné'
-  }
-
-  function getCompatibilityLabel(score: number) {
-    if (score >= 80) return 'Très compatible'
-    if (score >= 60) return 'Compatible'
-    return 'Peu compatible'
+  async function reloadTrips() {
+    if (!familyId) return
+    setTrips(await loadTrips(familyId))
   }
 
   function toggleTripSelection(tripId: string) {
     setSelectedTripIds((prev) =>
       prev.includes(tripId) ? prev.filter((id) => id !== tripId) : [...prev, tripId]
     )
+  }
+
+  function selectAllTrips() {
+    setSelectedTripIds(selectedChildTrips.map((trip) => trip.id))
+  }
+
+  function clearAllTrips() {
+    setSelectedTripIds([])
+  }
+
+  function toggleDay(dayValue: number) {
+    setSelectedDays((prev) =>
+      prev.includes(dayValue)
+        ? prev.filter((value) => value !== dayValue)
+        : [...prev, dayValue].sort((a, b) => a - b)
+    )
+  }
+
+  async function searchPlaces(query: string, target: 'from' | 'to') {
+    if (query.trim().length < 2) {
+      if (target === 'from') setFromResults([])
+      else setToResults([])
+      return
+    }
+
+    const response = await fetch(`/api/places/search?q=${encodeURIComponent(query.trim())}`)
+    const payload = await response.json().catch(() => null)
+
+    if (!response.ok) {
+      return
+    }
+
+    const searchResults = payload?.results ?? []
+
+    if (target === 'from') setFromResults(searchResults)
+    else setToResults(searchResults)
   }
 
   async function handleAddChild(e: FormEvent) {
@@ -172,12 +212,83 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
       return
     }
 
-    setChildren((prev) => [...prev, data])
+    await reloadChildren()
     setSelectedChildId(data.id)
     setChildFirstName('')
     setChildLevel('')
     setShowAddChild(false)
     showPopup('Enfant ajouté.', 'success')
+  }
+
+  async function handleAddTrip(e: FormEvent) {
+    e.preventDefault()
+    setError('')
+
+    if (!familyId || !selectedChildId) {
+      showPopup('Veuillez sélectionner un enfant.', 'error')
+      return
+    }
+
+    if (!fromPlaceId || !toPlaceId) {
+      showPopup('Veuillez sélectionner un départ et une destination dans la liste proposée.', 'error')
+      return
+    }
+
+    if (fromPlaceId === toPlaceId) {
+      showPopup('Le départ et la destination doivent être différents.', 'error')
+      return
+    }
+
+    if (!fromTime) {
+      showPopup('Veuillez renseigner l’horaire.', 'error')
+      return
+    }
+
+    if (selectedDays.length === 0) {
+      showPopup('Veuillez sélectionner au moins un jour.', 'error')
+      return
+    }
+
+    setSavingTrip(true)
+
+    const tripGroupId = crypto.randomUUID()
+
+    const rows = selectedDays.map((day) => ({
+      family_id: familyId,
+      child_id: selectedChildId,
+      from_place_id: fromPlaceId,
+      to_place_id: toPlaceId,
+      from_place_suggestion_id: null,
+      to_place_suggestion_id: null,
+      day_of_week: day,
+      from_time: fromTime,
+      to_time: null,
+      tolerance_min: Number(toleranceMin) || 10,
+      status: 'searching',
+      trip_group_id: tripGroupId,
+    }))
+
+    const { error } = await supabase.from('trips').insert(rows)
+
+    setSavingTrip(false)
+
+    if (error) {
+      showPopup(error.message, 'error')
+      return
+    }
+
+    await reloadTrips()
+    setFromPlaceQuery('')
+    setToPlaceQuery('')
+    setFromPlaceId('')
+    setToPlaceId('')
+    setFromResults([])
+    setToResults([])
+    setSelectedDays([])
+    setFromTime('')
+    setToleranceMin('10')
+    setShowAddTrip(false)
+    showPopup('Trajet créé.', 'success')
   }
 
   async function launchMatching() {
@@ -187,21 +298,26 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
     try {
       const allResults = await runFamilyMatchingRequest()
 
-      if (selectedTripIds.length === 0) {
-        setResults(allResults)
-      } else {
-        const filteredResults = allResults
-          .map((match) => ({
-            ...match,
-            trip_matches: match.trip_matches.filter((tripMatch) =>
-              selectedTripIds.includes(tripMatch.requester_trip_id)
-            ),
-          }))
-          .filter((match) => match.trip_matches.length > 0)
+      const filteredResults =
+        selectedTripIds.length === 0
+          ? allResults
+          : allResults
+              .map((match) => ({
+                ...match,
+                trip_matches: match.trip_matches.filter((tripMatch) =>
+                  selectedTripIds.includes(tripMatch.requester_trip_id)
+                ),
+              }))
+              .filter((match) => match.trip_matches.length > 0)
+              .map((match) => ({
+                ...match,
+                matched_trip_count: match.trip_matches.length,
+                matched_requester_trip_count: Array.from(
+                  new Set(match.trip_matches.map((tripMatch) => tripMatch.requester_trip_id))
+                ).length,
+              }))
 
-        setResults(filteredResults)
-      }
-
+      setResults(filteredResults)
       setStep(3)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la recherche.')
@@ -218,7 +334,9 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
     const confirmed = window.confirm(
       `Envoyer une demande à ${parentName} ?
 
-Le parent recevra votre demande et pourra accepter ou refuser.`
+Cette famille recevra votre demande et pourra vous répondre directement.
+
+Vous serez prévenu dès qu’une réponse sera donnée.`
     )
 
     if (!confirmed) return
@@ -244,7 +362,7 @@ Le parent recevra votre demande et pourra accepter ou refuser.`
       })
 
       showPopup(
-        'Votre demande a été envoyée. Vous serez informé dès que l’autre parent répond.',
+        `Votre demande a bien été envoyée à ${parentName}. Nous vous informerons dès qu’une réponse sera donnée.`,
         'success'
       )
       setStep(4)
@@ -253,6 +371,16 @@ Le parent recevra votre demande et pourra accepter ou refuser.`
         err instanceof Error ? err.message : 'Erreur lors de l’envoi de la demande.'
       showPopup(message, 'error')
     }
+  }
+
+  function scoreExplanation(score: number) {
+    if (score >= 80) {
+      return 'Score estimé à partir des lieux, des horaires et de l’historique des échanges.'
+    }
+    if (score >= 60) {
+      return 'Compatibilité estimée à partir de la proximité des trajets et des horaires.'
+    }
+    return 'Compatibilité partielle selon les lieux, horaires et échanges précédents.'
   }
 
   if (loading) {
@@ -279,9 +407,6 @@ Le parent recevra votre demande et pourra accepter ou refuser.`
             <div className={styles.topbar}>
               <div>
                 <h1 className={styles.pageTitle}>Trouver une correspondance</h1>
-                <p className={styles.pageIntro}>
-                  Choisissez un enfant, sélectionnez les trajets à rechercher, puis consultez les familles compatibles.
-                </p>
               </div>
               <div className={styles.topbarActions}>
                 <Link href="/dashboard" className={styles.secondaryButton}>
@@ -290,18 +415,11 @@ Le parent recevra votre demande et pourra accepter ou refuser.`
               </div>
             </div>
 
-            <div className={styles.stepper}>
-              <div className={step === 1 ? styles.stepPillActive : styles.stepPill}>1. Enfant</div>
-              <div className={step === 2 ? styles.stepPillActive : styles.stepPill}>2. Trajets</div>
-              <div className={step === 3 ? styles.stepPillActive : styles.stepPill}>3. Résultats</div>
-              <div className={step === 4 ? styles.stepPillActive : styles.stepPill}>4. Suite</div>
-            </div>
-
             {error ? <p className={styles.errorMessage}>{error}</p> : null}
 
             {step === 1 ? (
               <div className={styles.sectionCard}>
-                <h2 className={styles.sectionTitle}>Étape 1 — Sélectionner un enfant</h2>
+                <h2 className={styles.sectionTitle}>Sélectionner un enfant</h2>
 
                 {children.length === 0 ? (
                   <p className={styles.statusMessage}>Aucun enfant enregistré.</p>
@@ -383,40 +501,42 @@ Le parent recevra votre demande et pourra accepter ou refuser.`
 
             {step === 2 ? (
               <div className={styles.sectionCard}>
-                <h2 className={styles.sectionTitle}>Étape 2 — Sélectionner les trajets</h2>
+                <h2 className={styles.sectionTitle}>Sélectionner les trajets</h2>
 
                 {selectedChildTrips.length === 0 ? (
                   <p className={styles.statusMessage}>
                     Aucun trajet en recherche pour cet enfant.
                   </p>
                 ) : (
-                  <div className={styles.itemList}>
-                    {selectedChildTrips.map((trip) => (
-                      <label key={trip.id} className={styles.itemCard} style={{ cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={selectedTripIds.includes(trip.id)}
-                          onChange={() => toggleTripSelection(trip.id)}
-                          style={{ marginRight: 10 }}
-                        />
-                        <strong>{formatSingleDay(trip.day_of_week)}</strong>
-                        <div className={styles.itemBody} style={{ marginTop: 8 }}>
-                          <p>
-                            <strong>Horaire :</strong> {formatTimeValue(trip.from_time)}
-                            {trip.to_time ? ` → ${formatTimeValue(trip.to_time)}` : ''}
-                          </p>
-                          <p>
-                            <strong>Départ :</strong>{' '}
-                            {placeLabel(trip.from_place_id, trip.from_place_suggestion_id)}
-                          </p>
-                          <p>
-                            <strong>Destination :</strong>{' '}
-                            {placeLabel(trip.to_place_id, trip.to_place_suggestion_id)}
-                          </p>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
+                  <>
+                    <div className={styles.itemActions}>
+                      <button type="button" className={styles.secondaryButton} onClick={selectAllTrips}>
+                        Tout sélectionner
+                      </button>
+                      <button type="button" className={styles.secondaryButton} onClick={clearAllTrips}>
+                        Tout désélectionner
+                      </button>
+                    </div>
+
+                    <div className={styles.itemList} style={{ marginTop: 14 }}>
+                      {selectedChildTrips.map((trip) => (
+                        <label key={trip.id} className={styles.itemCard} style={{ cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={selectedTripIds.includes(trip.id)}
+                            onChange={() => toggleTripSelection(trip.id)}
+                            style={{ marginRight: 10 }}
+                          />
+                          <strong>{formatSingleDay(trip.day_of_week)}</strong>
+                          <div className={styles.itemBody} style={{ marginTop: 8 }}>
+                            <p>
+                              <strong>Horaire :</strong> {formatTimeValue(trip.from_time)}
+                            </p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </>
                 )}
 
                 <div className={styles.itemActions}>
@@ -431,9 +551,9 @@ Le parent recevra votre demande et pourra accepter ou refuser.`
                   <button
                     type="button"
                     className={styles.secondaryButton}
-                    onClick={() => setShowHelpText((prev) => !prev)}
+                    onClick={() => setShowAddTrip((prev) => !prev)}
                   >
-                    Ajouter un trajet
+                    {showAddTrip ? 'Fermer' : 'Ajouter un trajet'}
                   </button>
 
                   <Link href="/dashboard/trips" className={styles.secondaryButton}>
@@ -450,87 +570,223 @@ Le parent recevra votre demande et pourra accepter ou refuser.`
                   </button>
                 </div>
 
-                {showHelpText ? (
-                  <p className={styles.statusMessage}>
-                    Pour ajouter un trajet, ouvrez la page Trajets puis revenez ici.
-                  </p>
+                {showAddTrip ? (
+                  <div style={{ marginTop: 20 }}>
+                    <form onSubmit={handleAddTrip} className={styles.form}>
+                      <div className={styles.field}>
+                        <label>Enfant</label>
+                        <input
+                          value={
+                            children.find((child) => child.id === selectedChildId)?.first_name || ''
+                          }
+                          disabled
+                        />
+                      </div>
+
+                      <div className={styles.field}>
+                        <label>Jours</label>
+                        <div className={styles.itemActions}>
+                          {DAY_OPTIONS.map((day) => (
+                            <button
+                              key={day.value}
+                              type="button"
+                              className={
+                                selectedDays.includes(day.value)
+                                  ? styles.primaryButton
+                                  : styles.secondaryButton
+                              }
+                              onClick={() => toggleDay(day.value)}
+                            >
+                              {day.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className={styles.field}>
+                        <label htmlFor="fromPlaceQuery">Départ</label>
+                        <input
+                          id="fromPlaceQuery"
+                          className={styles.input}
+                          value={fromPlaceQuery}
+                          onChange={(e) => {
+                            setFromPlaceQuery(e.target.value)
+                            setFromPlaceId('')
+                            void searchPlaces(e.target.value, 'from')
+                          }}
+                          placeholder="Commencez à saisir un lieu"
+                        />
+                        {fromResults.length > 0 ? (
+                          <div className={styles.itemList} style={{ marginTop: 8 }}>
+                            {fromResults.map((item) => (
+                              <button
+                                key={item.id}
+                                type="button"
+                                className={styles.secondaryButton}
+                                onClick={() => {
+                                  setFromPlaceId(item.id)
+                                  setFromPlaceQuery(`${item.name} (${item.city})`)
+                                  setFromResults([])
+                                }}
+                              >
+                                {item.name} ({item.city})
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                        <div className={styles.itemActions} style={{ marginTop: 8 }}>
+                          <Link href="/dashboard/places" className={styles.secondaryButton}>
+                            Proposer un nouveau lieu
+                          </Link>
+                        </div>
+                      </div>
+
+                      <div className={styles.field}>
+                        <label htmlFor="toPlaceQuery">Destination</label>
+                        <input
+                          id="toPlaceQuery"
+                          className={styles.input}
+                          value={toPlaceQuery}
+                          onChange={(e) => {
+                            setToPlaceQuery(e.target.value)
+                            setToPlaceId('')
+                            void searchPlaces(e.target.value, 'to')
+                          }}
+                          placeholder="Commencez à saisir un lieu"
+                        />
+                        {toResults.length > 0 ? (
+                          <div className={styles.itemList} style={{ marginTop: 8 }}>
+                            {toResults.map((item) => (
+                              <button
+                                key={item.id}
+                                type="button"
+                                className={styles.secondaryButton}
+                                onClick={() => {
+                                  setToPlaceId(item.id)
+                                  setToPlaceQuery(`${item.name} (${item.city})`)
+                                  setToResults([])
+                                }}
+                              >
+                                {item.name} ({item.city})
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                        <div className={styles.itemActions} style={{ marginTop: 8 }}>
+                          <Link href="/dashboard/places" className={styles.secondaryButton}>
+                            Proposer un nouveau lieu
+                          </Link>
+                        </div>
+                      </div>
+
+                      <div className={styles.fieldRow}>
+                        <div className={styles.field}>
+                          <label htmlFor="fromTime">Horaire</label>
+                          <input
+                            id="fromTime"
+                            type="time"
+                            className={styles.input}
+                            value={fromTime}
+                            onChange={(e) => setFromTime(e.target.value)}
+                            required
+                          />
+                        </div>
+
+                        <div className={styles.field}>
+                          <label htmlFor="toleranceMin">Tolérance (minutes)</label>
+                          <input
+                            id="toleranceMin"
+                            type="number"
+                            className={styles.input}
+                            min={0}
+                            max={180}
+                            value={toleranceMin}
+                            onChange={(e) => setToleranceMin(e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className={styles.itemActions}>
+                        <button type="submit" className={styles.primaryButton} disabled={savingTrip}>
+                          {savingTrip ? 'Enregistrement...' : 'Créer ce trajet'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
                 ) : null}
               </div>
             ) : null}
 
             {step === 3 ? (
               <div className={styles.sectionCard}>
-                <h2 className={styles.sectionTitle}>Étape 3 — Résultats</h2>
+                <h2 className={styles.sectionTitle}>Résultats</h2>
 
                 {results.length === 0 ? (
                   <p className={styles.statusMessage}>
-                    Aucun parent compatible trouvé pour le moment.
+                    Aucun parent compatible trouvé pour le moment. On vous tiendra au courant dès qu’un trajet compatible sera disponible.
                   </p>
                 ) : (
                   <div className={styles.itemList}>
-                    {results.map((match) => (
-                      <div key={match.target_family_id} className={styles.itemCard}>
-                        <div className={styles.itemHeader}>
-                          <div>
-                            <h3 className={styles.itemTitle}>
-                              {`${match.target_parent_first_name || ''} ${match.target_parent_last_name || ''}`.trim() ||
-                                'Famille compatible'}
-                            </h3>
-                            <p className={styles.itemMeta}>
-                              Jours couverts : {formatDayValues(match.covered_day_of_week_values)}
-                            </p>
-                          </div>
-                          <span className={styles.badgeGreen}>
-                            {getCompatibilityLabel(match.compatibility_score)} ({match.compatibility_score}%)
-                          </span>
-                        </div>
+                    {results.map((match) => {
+                      const parentName =
+                        `${match.target_parent_first_name || ''} ${match.target_parent_last_name || ''}`.trim() ||
+                        'Famille compatible'
 
-                        <div className={styles.itemBody}>
-                          <p>Nom de l’autre famille : {`${match.target_parent_first_name || ''} ${match.target_parent_last_name || ''}`.trim() || '—'}</p>
-                          <p>Historique : {match.history_label}</p>
-                          <p>Trajets compatibles : {match.matched_requester_trip_count}</p>
-                        </div>
-
-                        <div className={styles.itemList}>
-                          {match.trip_matches.map((tripMatch) => (
-                            <div
-                              key={`${tripMatch.requester_trip_id}-${tripMatch.target_trip_id}`}
-                              className={styles.itemCard}
-                              style={{ padding: 14 }}
-                            >
-                              <p>
-                                <strong>{formatSingleDay(tripMatch.day_of_week)}</strong>
-                              </p>
-                              <p>Enfant : {tripMatch.requester_child_first_name || '—'}</p>
-                              <p>Départ : {tripMatch.requester_from_label}</p>
-                              <p>Destination : {tripMatch.requester_to_label}</p>
-                              <p>
-                                Votre horaire : {formatTimeValue(tripMatch.requester_from_time)}
-                                {tripMatch.requester_to_time
-                                  ? ` → ${formatTimeValue(tripMatch.requester_to_time)}`
-                                  : ''}
-                              </p>
-                              <p>
-                                Horaire de l’autre famille : {formatTimeValue(tripMatch.target_from_time)}
-                                {tripMatch.target_to_time
-                                  ? ` → ${formatTimeValue(tripMatch.target_to_time)}`
-                                  : ''}
-                              </p>
+                      return (
+                        <div key={match.target_family_id} className={styles.itemCard}>
+                          <div className={styles.itemHeader}>
+                            <div>
+                              <h3 className={styles.itemTitle}>{parentName}</h3>
+                              <p className={styles.itemMeta}>Historique : {match.history_label}</p>
                             </div>
-                          ))}
-                        </div>
 
-                        <div className={styles.itemActions}>
-                          <button
-                            type="button"
-                            className={styles.primaryButton}
-                            onClick={() => handleRequestContact(match)}
-                          >
-                            Demander la mise en relation
-                          </button>
+                            <span
+                              className={styles.badgeGreen}
+                              title={scoreExplanation(match.compatibility_score)}
+                            >
+                              {match.compatibility_score}% ⓘ
+                            </span>
+                          </div>
+
+                          <div className={styles.itemBody}>
+                            <p>Trajets compatibles : {match.matched_requester_trip_count}</p>
+                          </div>
+
+                          <div className={styles.itemList}>
+                            {match.trip_matches.map((tripMatch) => (
+                              <div
+                                key={`${tripMatch.requester_trip_id}-${tripMatch.target_trip_id}`}
+                                className={styles.itemCard}
+                                style={{ padding: 14 }}
+                              >
+                                <p>
+                                  <strong>{formatSingleDay(tripMatch.day_of_week)}</strong>
+                                </p>
+                                <p>Enfant : {tripMatch.requester_child_first_name || '—'}</p>
+                                <p>Départ : {tripMatch.requester_from_label}</p>
+                                <p>Destination : {tripMatch.requester_to_label}</p>
+                                <p>
+                                  Votre horaire : {formatTimeValue(tripMatch.requester_from_time)}
+                                </p>
+                                <p>
+                                  Horaire de l’autre famille : {formatTimeValue(tripMatch.target_from_time)}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className={styles.itemActions}>
+                            <button
+                              type="button"
+                              className={styles.primaryButton}
+                              onClick={() => handleRequestContact(match)}
+                            >
+                              Demander la mise en relation
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
 
@@ -548,7 +804,7 @@ Le parent recevra votre demande et pourra accepter ou refuser.`
 
             {step === 4 ? (
               <div className={styles.sectionCard}>
-                <h2 className={styles.sectionTitle}>Étape 4 — Suite</h2>
+                <h2 className={styles.sectionTitle}>Suite</h2>
                 <p className={styles.sectionText}>
                   Votre demande a bien été envoyée. Vous pouvez suivre son évolution dans vos demandes.
                 </p>

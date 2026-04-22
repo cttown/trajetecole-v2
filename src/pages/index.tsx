@@ -91,7 +91,11 @@ export default function HomePage() {
                         Mon espace
                       </Link>
 
-                      <button type="button" className={styles.secondaryButton} onClick={handleLogout}>
+                      <button
+                        type="button"
+                        className={styles.secondaryButton}
+                        onClick={handleLogout}
+                      >
                         Se déconnecter
                       </button>
                     </div>
@@ -225,18 +229,6 @@ export default function HomePage() {
         <section className={styles.quickLinksSection}>
           <div className={styles.container}>
             <div className={styles.quickLinksGrid}>
-              {!isLoggedIn ? (
-                <Link href="/signup" className={styles.quickLinkCard}>
-                  <div className={styles.quickLinkIcon}>👤</div>
-                  <span>Créer un compte</span>
-                </Link>
-              ) : (
-                <Link href="/dashboard" className={styles.quickLinkCard}>
-                  <div className={styles.quickLinkIcon}>📁</div>
-                  <span>Mon espace</span>
-                </Link>
-              )}
-
               <Link href="/contact-admin" className={styles.quickLinkCard}>
                 <div className={styles.quickLinkIcon}>✉️</div>
                 <span>Contacter l&apos;admin</span>

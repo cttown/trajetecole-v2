@@ -1,46 +1,51 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { supabaseAdmin } from '../../../lib/supabaseAdmin'
+import { createClient } from '@supabase/supabase-js'
 
-type SearchPlaceRow = {
-  id: string
-  name: string
-  city: string
-  exact_address: string | null
-  kind: 'school' | 'activity' | 'other'
-  score: number
+function requireEnv(name: string): string {
+  const value = process.env[name]
+  if (!value) {
+    throw new Error(`Missing environment variable: ${name}`)
+  }
+  return value
 }
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<SearchPlaceRow[] | { error: string; details?: unknown }>
+  res: NextApiResponse
 ) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const query = Array.isArray(req.query.query) ? req.query.query[0] : req.query.query
+  try {
+    const q = String(req.query.q || '').trim()
 
-  if (!query || typeof query !== 'string' || query.trim().length < 2) {
-    return res.status(200).json([])
-  }
+    if (q.length < 2) {
+      return res.status(200).json({ results: [] })
+    }
 
-  const trimmedQuery = query.trim()
+    const supabaseUrl = requireEnv('NEXT_PUBLIC_SUPABASE_URL')
+    const serviceRoleKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey)
 
-  console.log('[places/search] query =', trimmedQuery)
+    const { data, error } = await supabaseAdmin
+      .from('places')
+      .select('id, name, city, kind')
+      .eq('is_active', true)
+      .or(`name.ilike.%${q}%,city.ilike.%${q}%`)
+      .order('name', { ascending: true })
+      .limit(8)
 
-  const { data, error } = await supabaseAdmin.rpc('search_places', {
-    search_query: trimmedQuery,
-  })
+    if (error) {
+      return res.status(500).json({ error: error.message })
+    }
 
-  if (error) {
-    console.error('[places/search] rpc error:', error)
+    return res.status(200).json({
+      results: data ?? [],
+    })
+  } catch (error) {
     return res.status(500).json({
-      error: 'Search failed',
-      details: error.message,
+      error: error instanceof Error ? error.message : 'Unexpected server error',
     })
   }
-
-  console.log('[places/search] result count =', data?.length ?? 0)
-
-  return res.status(200).json((data ?? []) as SearchPlaceRow[])
 }

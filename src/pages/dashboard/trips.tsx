@@ -5,16 +5,12 @@ import { useRouter } from 'next/router'
 import styles from '../../styles/Dashboard.module.css'
 import {
   Child,
-  Place,
-  PlaceSuggestion,
   Trip,
   TripStatus,
   formatSingleDay,
   formatTimeValue,
   formatTripStatus,
   loadChildren,
-  loadPlaces,
-  loadPlaceSuggestions,
   loadTrips,
   requireFamily,
 } from '../../lib/dashboardShared'
@@ -23,6 +19,12 @@ import type { SetGlobalPopup } from '../_app'
 
 type Props = {
   setGlobalPopup?: SetGlobalPopup
+}
+
+type SearchPlaceResult = {
+  id: string
+  name: string
+  city: string
 }
 
 const STATUS_OPTIONS: { value: TripStatus; label: string }[] = [
@@ -63,16 +65,10 @@ function groupTripsByTripGroup(trips: Trip[]) {
     groups.set(trip.trip_group_id, current)
   }
 
-  return Array.from(groups.entries())
-    .map(([tripGroupId, items]) => ({
-      tripGroupId,
-      items: [...items].sort((a, b) => a.day_of_week - b.day_of_week),
-    }))
-    .sort((a, b) => {
-      const aFirst = a.items[0]
-      const bFirst = b.items[0]
-      return (aFirst?.day_of_week ?? 0) - (bFirst?.day_of_week ?? 0)
-    })
+  return Array.from(groups.entries()).map(([tripGroupId, items]) => ({
+    tripGroupId,
+    items: [...items].sort((a, b) => a.day_of_week - b.day_of_week),
+  }))
 }
 
 export default function DashboardTripsPage({ setGlobalPopup }: Props) {
@@ -81,8 +77,6 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
 
   const [familyId, setFamilyId] = useState('')
   const [children, setChildren] = useState<Child[]>([])
-  const [places, setPlaces] = useState<Place[]>([])
-  const [placeSuggestions, setPlaceSuggestions] = useState<PlaceSuggestion[]>([])
   const [trips, setTrips] = useState<Trip[]>([])
 
   const [loading, setLoading] = useState(true)
@@ -93,25 +87,25 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
   const [showAddForm, setShowAddForm] = useState(false)
 
   const [childId, setChildId] = useState('')
+  const [fromPlaceQuery, setFromPlaceQuery] = useState('')
+  const [toPlaceQuery, setToPlaceQuery] = useState('')
   const [fromPlaceId, setFromPlaceId] = useState('')
-  const [fromSuggestionId, setFromSuggestionId] = useState('')
   const [toPlaceId, setToPlaceId] = useState('')
-  const [toSuggestionId, setToSuggestionId] = useState('')
+  const [fromResults, setFromResults] = useState<SearchPlaceResult[]>([])
+  const [toResults, setToResults] = useState<SearchPlaceResult[]>([])
   const [selectedDays, setSelectedDays] = useState<number[]>([])
   const [fromTime, setFromTime] = useState('')
-  const [toTime, setToTime] = useState('')
   const [toleranceMin, setToleranceMin] = useState('10')
-  const [status, setStatus] = useState<TripStatus>('searching')
+
+  const [editingTripGroupId, setEditingTripGroupId] = useState<string | null>(null)
+  const [editingStatus, setEditingStatus] = useState<TripStatus>('searching')
 
   function showPopup(message: string, type: 'success' | 'error' = 'success') {
     if (setGlobalPopup) {
       setGlobalPopup({ message, type })
       return
     }
-
-    if (type === 'error') {
-      setError(message)
-    }
+    if (type === 'error') setError(message)
   }
 
   useEffect(() => {
@@ -122,17 +116,13 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
 
         setFamilyId(family.id)
 
-        const [childrenData, tripsData, placesData, suggestionsData] = await Promise.all([
+        const [childrenData, tripsData] = await Promise.all([
           loadChildren(family.id),
           loadTrips(family.id),
-          loadPlaces(),
-          loadPlaceSuggestions(family.id),
         ])
 
         setChildren(childrenData)
         setTrips(tripsData)
-        setPlaces(placesData)
-        setPlaceSuggestions(suggestionsData)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erreur de chargement.')
       } finally {
@@ -148,16 +138,6 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
     [children]
   )
 
-  const placeMap = useMemo(
-    () => Object.fromEntries(places.map((place) => [place.id, place])),
-    [places]
-  )
-
-  const suggestionMap = useMemo(
-    () => Object.fromEntries(placeSuggestions.map((item) => [item.id, item])),
-    [placeSuggestions]
-  )
-
   const groupedTrips = useMemo(() => groupTripsByTripGroup(trips), [trips])
 
   const searchingGroups = groupedTrips.filter((group) => group.items[0]?.status === 'searching')
@@ -167,38 +147,30 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
   const resolvedGroups = groupedTrips.filter((group) => group.items[0]?.status === 'resolved')
   const archivedGroups = groupedTrips.filter((group) => group.items[0]?.status === 'archived')
 
-  const availableSuggestions = useMemo(
-    () => placeSuggestions.filter((item) => item.status === 'pending'),
-    [placeSuggestions]
-  )
-
-  function resetForm() {
-    setChildId('')
-    setFromPlaceId('')
-    setFromSuggestionId('')
-    setToPlaceId('')
-    setToSuggestionId('')
-    setSelectedDays([])
-    setFromTime('')
-    setToTime('')
-    setToleranceMin('10')
-    setStatus('searching')
+  async function reloadTrips() {
+    if (!familyId) return
+    const tripsData = await loadTrips(familyId)
+    setTrips(tripsData)
   }
 
-  function formatPlaceLabel(placeId: string | null, suggestionId?: string | null) {
-    if (placeId) {
-      const place = placeMap[placeId]
-      return place ? `${place.name} (${place.city})` : 'Lieu inconnu'
+  async function searchPlaces(query: string, target: 'from' | 'to') {
+    if (query.trim().length < 2) {
+      if (target === 'from') setFromResults([])
+      else setToResults([])
+      return
     }
 
-    if (suggestionId) {
-      const suggestion = suggestionMap[suggestionId]
-      return suggestion
-        ? `${suggestion.suggested_name} (suggestion en attente)`
-        : 'Suggestion inconnue'
+    const response = await fetch(`/api/places/search?q=${encodeURIComponent(query.trim())}`)
+    const payload = await response.json().catch(() => null)
+
+    if (!response.ok) {
+      return
     }
 
-    return 'Lieu non renseigné'
+    const results = payload?.results ?? []
+
+    if (target === 'from') setFromResults(results)
+    else setToResults(results)
   }
 
   function toggleDay(dayValue: number) {
@@ -209,10 +181,17 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
     )
   }
 
-  async function reloadTrips() {
-    if (!familyId) return
-    const tripsData = await loadTrips(familyId)
-    setTrips(tripsData)
+  function resetForm() {
+    setChildId('')
+    setFromPlaceQuery('')
+    setToPlaceQuery('')
+    setFromPlaceId('')
+    setToPlaceId('')
+    setFromResults([])
+    setToResults([])
+    setSelectedDays([])
+    setFromTime('')
+    setToleranceMin('10')
   }
 
   async function handleAddTrip(e: FormEvent) {
@@ -229,23 +208,23 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
       return
     }
 
+    if (!fromPlaceId || !toPlaceId) {
+      showPopup('Veuillez sélectionner un départ et une destination dans la liste proposée.', 'error')
+      return
+    }
+
+    if (fromPlaceId === toPlaceId) {
+      showPopup('Le départ et la destination doivent être différents.', 'error')
+      return
+    }
+
     if (!fromTime) {
-      showPopup('Veuillez renseigner l’horaire de départ.', 'error')
+      showPopup('Veuillez renseigner l’horaire.', 'error')
       return
     }
 
     if (selectedDays.length === 0) {
       showPopup('Veuillez sélectionner au moins un jour.', 'error')
-      return
-    }
-
-    if ((!fromPlaceId && !fromSuggestionId) || (!toPlaceId && !toSuggestionId)) {
-      showPopup('Veuillez renseigner un départ et une destination.', 'error')
-      return
-    }
-
-    if (fromPlaceId && toPlaceId && fromPlaceId === toPlaceId) {
-      showPopup('Le départ et la destination doivent être différents.', 'error')
       return
     }
 
@@ -256,15 +235,15 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
     const rows = selectedDays.map((day) => ({
       family_id: familyId,
       child_id: childId,
-      from_place_id: fromPlaceId || null,
-      to_place_id: toPlaceId || null,
-      from_place_suggestion_id: fromSuggestionId || null,
-      to_place_suggestion_id: toSuggestionId || null,
+      from_place_id: fromPlaceId,
+      to_place_id: toPlaceId,
+      from_place_suggestion_id: null,
+      to_place_suggestion_id: null,
       day_of_week: day,
       from_time: fromTime,
-      to_time: toTime || null,
+      to_time: null,
       tolerance_min: Number(toleranceMin) || 10,
-      status,
+      status: 'searching',
       trip_group_id: tripGroupId,
     }))
 
@@ -280,7 +259,7 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
     await reloadTrips()
     resetForm()
     setShowAddForm(false)
-    showPopup('Trajet ajouté.', 'success')
+    showPopup('Trajet créé.', 'success')
   }
 
   async function handleStatusChange(tripGroupId: string, nextStatus: TripStatus) {
@@ -323,6 +302,11 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
     showPopup('Trajet supprimé.', 'success')
   }
 
+  function openEdit(group: { tripGroupId: string; items: Trip[] }) {
+    setEditingTripGroupId(group.tripGroupId)
+    setEditingStatus(group.items[0]?.status || 'searching')
+  }
+
   function TripGroupList({
     title,
     groups,
@@ -352,15 +336,7 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
                     <div>
                       <h3 className={styles.itemTitle}>{child?.first_name || 'Enfant'}</h3>
                       <p className={styles.itemMeta}>
-                        {formatPlaceLabel(
-                          firstTrip?.from_place_id ?? null,
-                          firstTrip?.from_place_suggestion_id
-                        )}{' '}
-                        →{' '}
-                        {formatPlaceLabel(
-                          firstTrip?.to_place_id ?? null,
-                          firstTrip?.to_place_suggestion_id
-                        )}
+                        Jours : {group.items.map((trip) => formatSingleDay(trip.day_of_week)).join(', ')}
                       </p>
                     </div>
 
@@ -371,12 +347,7 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
 
                   <div className={styles.itemBody}>
                     <p>
-                      <strong>Jours :</strong>{' '}
-                      {group.items.map((trip) => formatSingleDay(trip.day_of_week)).join(', ')}
-                    </p>
-                    <p>
                       <strong>Horaire :</strong> {formatTimeValue(firstTrip?.from_time ?? null)}
-                      {firstTrip?.to_time ? ` → ${formatTimeValue(firstTrip.to_time)}` : ''}
                     </p>
                     <p>
                       <strong>Tolérance :</strong> {firstTrip?.tolerance_min ?? '—'} min
@@ -384,21 +355,13 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
                   </div>
 
                   <div className={styles.itemActions}>
-                    <select
-                      className={styles.select}
-                      value={firstTrip?.status ?? 'searching'}
-                      onChange={(e) =>
-                        handleStatusChange(group.tripGroupId, e.target.value as TripStatus)
-                      }
-                      disabled={updatingTripId === group.tripGroupId}
-                      style={{ maxWidth: 420 }}
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() => openEdit(group)}
                     >
-                      {STATUS_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                      Modifier
+                    </button>
 
                     <button
                       type="button"
@@ -406,11 +369,47 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
                       onClick={() => handleDeleteTripGroup(group.tripGroupId)}
                       disabled={deletingTripGroupId === group.tripGroupId}
                     >
-                      {deletingTripGroupId === group.tripGroupId
-                        ? 'Suppression...'
-                        : 'Supprimer'}
+                      {deletingTripGroupId === group.tripGroupId ? 'Suppression...' : 'Supprimer'}
                     </button>
                   </div>
+
+                  {editingTripGroupId === group.tripGroupId ? (
+                    <div style={{ marginTop: 16 }}>
+                      <div className={styles.field}>
+                        <label>Statut</label>
+                        <select
+                          className={styles.select}
+                          value={editingStatus}
+                          onChange={(e) => setEditingStatus(e.target.value as TripStatus)}
+                        >
+                          {STATUS_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className={styles.itemActions} style={{ marginTop: 12 }}>
+                        <button
+                          type="button"
+                          className={styles.primaryButton}
+                          onClick={() => handleStatusChange(group.tripGroupId, editingStatus)}
+                          disabled={updatingTripId === group.tripGroupId}
+                        >
+                          {updatingTripId === group.tripGroupId ? 'Enregistrement...' : 'Enregistrer'}
+                        </button>
+
+                        <button
+                          type="button"
+                          className={styles.secondaryButton}
+                          onClick={() => setEditingTripGroupId(null)}
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               )
             })
@@ -468,7 +467,7 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
                   className={styles.primaryButton}
                   onClick={() => setShowAddForm((prev) => !prev)}
                 >
-                  {showAddForm ? 'Fermer' : 'Ajouter un trajet'}
+                  {showAddForm ? 'Fermer' : 'Créer un trajet'}
                 </button>
               </div>
 
@@ -514,93 +513,85 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
                       </div>
                     </div>
 
-                    <div className={styles.fieldRow}>
-                      <div className={styles.field}>
-                        <label htmlFor="fromPlaceId">Départ (lieu validé)</label>
-                        <select
-                          id="fromPlaceId"
-                          className={styles.select}
-                          value={fromPlaceId}
-                          onChange={(e) => {
-                            setFromPlaceId(e.target.value)
-                            setFromSuggestionId('')
-                          }}
-                        >
-                          <option value="">Sélectionner</option>
-                          {places.map((place) => (
-                            <option key={place.id} value={place.id}>
-                              {place.name} ({place.city})
-                            </option>
+                    <div className={styles.field}>
+                      <label htmlFor="fromPlaceQuery">Départ</label>
+                      <input
+                        id="fromPlaceQuery"
+                        className={styles.input}
+                        value={fromPlaceQuery}
+                        onChange={(e) => {
+                          setFromPlaceQuery(e.target.value)
+                          setFromPlaceId('')
+                          void searchPlaces(e.target.value, 'from')
+                        }}
+                        placeholder="Commencez à saisir un lieu"
+                      />
+                      {fromResults.length > 0 ? (
+                        <div className={styles.itemList} style={{ marginTop: 8 }}>
+                          {fromResults.map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              className={styles.secondaryButton}
+                              onClick={() => {
+                                setFromPlaceId(item.id)
+                                setFromPlaceQuery(`${item.name} (${item.city})`)
+                                setFromResults([])
+                              }}
+                            >
+                              {item.name} ({item.city})
+                            </button>
                           ))}
-                        </select>
+                        </div>
+                      ) : null}
+                      <div className={styles.itemActions} style={{ marginTop: 8 }}>
+                        <Link href="/dashboard/places" className={styles.secondaryButton}>
+                          Proposer un nouveau lieu
+                        </Link>
                       </div>
+                    </div>
 
-                      <div className={styles.field}>
-                        <label htmlFor="fromSuggestionId">Départ (suggestion)</label>
-                        <select
-                          id="fromSuggestionId"
-                          className={styles.select}
-                          value={fromSuggestionId}
-                          onChange={(e) => {
-                            setFromSuggestionId(e.target.value)
-                            setFromPlaceId('')
-                          }}
-                        >
-                          <option value="">Aucune</option>
-                          {availableSuggestions.map((item) => (
-                            <option key={item.id} value={item.id}>
-                              {item.suggested_name} ({item.city})
-                            </option>
+                    <div className={styles.field}>
+                      <label htmlFor="toPlaceQuery">Destination</label>
+                      <input
+                        id="toPlaceQuery"
+                        className={styles.input}
+                        value={toPlaceQuery}
+                        onChange={(e) => {
+                          setToPlaceQuery(e.target.value)
+                          setToPlaceId('')
+                          void searchPlaces(e.target.value, 'to')
+                        }}
+                        placeholder="Commencez à saisir un lieu"
+                      />
+                      {toResults.length > 0 ? (
+                        <div className={styles.itemList} style={{ marginTop: 8 }}>
+                          {toResults.map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              className={styles.secondaryButton}
+                              onClick={() => {
+                                setToPlaceId(item.id)
+                                setToPlaceQuery(`${item.name} (${item.city})`)
+                                setToResults([])
+                              }}
+                            >
+                              {item.name} ({item.city})
+                            </button>
                           ))}
-                        </select>
+                        </div>
+                      ) : null}
+                      <div className={styles.itemActions} style={{ marginTop: 8 }}>
+                        <Link href="/dashboard/places" className={styles.secondaryButton}>
+                          Proposer un nouveau lieu
+                        </Link>
                       </div>
                     </div>
 
                     <div className={styles.fieldRow}>
                       <div className={styles.field}>
-                        <label htmlFor="toPlaceId">Destination (lieu validé)</label>
-                        <select
-                          id="toPlaceId"
-                          className={styles.select}
-                          value={toPlaceId}
-                          onChange={(e) => {
-                            setToPlaceId(e.target.value)
-                            setToSuggestionId('')
-                          }}
-                        >
-                          <option value="">Sélectionner</option>
-                          {places.map((place) => (
-                            <option key={place.id} value={place.id}>
-                              {place.name} ({place.city})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className={styles.field}>
-                        <label htmlFor="toSuggestionId">Destination (suggestion)</label>
-                        <select
-                          id="toSuggestionId"
-                          className={styles.select}
-                          value={toSuggestionId}
-                          onChange={(e) => {
-                            setToSuggestionId(e.target.value)
-                            setToPlaceId('')
-                          }}
-                        >
-                          <option value="">Aucune</option>
-                          {availableSuggestions.map((item) => (
-                            <option key={item.id} value={item.id}>
-                              {item.suggested_name} ({item.city})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className={styles.fieldRow}>
-                      <div className={styles.field}>
-                        <label htmlFor="fromTime">Horaire de départ</label>
+                        <label htmlFor="fromTime">Horaire</label>
                         <input
                           id="fromTime"
                           type="time"
@@ -611,19 +602,6 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
                         />
                       </div>
 
-                      <div className={styles.field}>
-                        <label htmlFor="toTime">Horaire de fin</label>
-                        <input
-                          id="toTime"
-                          type="time"
-                          className={styles.input}
-                          value={toTime}
-                          onChange={(e) => setToTime(e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <div className={styles.fieldRow}>
                       <div className={styles.field}>
                         <label htmlFor="toleranceMin">Tolérance (minutes)</label>
                         <input
@@ -636,27 +614,11 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
                           onChange={(e) => setToleranceMin(e.target.value)}
                         />
                       </div>
-
-                      <div className={styles.field}>
-                        <label htmlFor="status">Statut</label>
-                        <select
-                          id="status"
-                          className={styles.select}
-                          value={status}
-                          onChange={(e) => setStatus(e.target.value as TripStatus)}
-                        >
-                          {STATUS_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
                     </div>
 
                     <div className={styles.itemActions}>
                       <button type="submit" className={styles.primaryButton} disabled={saving}>
-                        {saving ? 'Enregistrement...' : 'Ajouter ce trajet'}
+                        {saving ? 'Enregistrement...' : 'Créer ce trajet'}
                       </button>
                     </div>
                   </form>

@@ -110,7 +110,7 @@ export default function DashboardRequestsPage({ setGlobalPopup }: Props) {
           <div>
             <h3 className={styles.itemTitle}>{formatFullParentName(item)}</h3>
             <p className={styles.itemMeta}>
-              Créée le {formatDateTime(item.created_at)} · Expire le {formatDateTime(item.expires_at)}
+              Créée le {formatDateTime(item.created_at)}
             </p>
           </div>
 
@@ -130,10 +130,6 @@ export default function DashboardRequestsPage({ setGlobalPopup }: Props) {
         </div>
 
         <div className={styles.itemBody}>
-          <p>
-            <strong>Autre parent :</strong> {formatFullParentName(item)}
-          </p>
-
           {item.trip_links.map((link) => {
             const requesterTrip = link.requester_trip
             const targetTrip = link.target_trip
@@ -167,7 +163,7 @@ export default function DashboardRequestsPage({ setGlobalPopup }: Props) {
 
         {item.status === 'accepted' && item.other_family ? (
           <p className={styles.successMessage}>
-            <strong>Email partagé :</strong> {item.other_family.email}
+            <strong>Email :</strong> {item.other_family.email}
           </p>
         ) : null}
 
