@@ -11,13 +11,9 @@ import {
   formatSingleDay,
   formatTimeValue,
   loadChildren,
-  loadPlaces,
-  loadPlaceSuggestions,
   loadTrips,
   requireFamily,
   runFamilyMatchingRequest,
-  Place,
-  PlaceSuggestion,
 } from '../../lib/dashboardShared'
 import { supabase } from '../../lib/supabaseClient'
 import { trackEvent } from '../../lib/trackEvent'
@@ -43,14 +39,70 @@ const DAY_OPTIONS = [
   { value: 7, label: 'Dimanche' },
 ]
 
+type ConfirmState = {
+  open: boolean
+  match: FamilyMatch | null
+}
+
+function recalculateFilteredMatch(match: FamilyMatch): FamilyMatch {
+  const uniqueRequesterTripIds = Array.from(
+    new Set(match.trip_matches.map((item) => item.requester_trip_id))
+  )
+  const uniqueDayValues = Array.from(
+    new Set(match.trip_matches.map((item) => item.day_of_week))
+  ).sort((a, b) => a - b)
+
+  const averageTimeFitScore =
+    match.trip_matches.length > 0
+      ? Math.round(
+          match.trip_matches.reduce((sum, item) => sum + item.time_fit_score, 0) /
+            match.trip_matches.length
+        )
+      : 0
+
+  const coverageRatio =
+    match.trip_matches.length > 0 ? 1 : 0
+
+  const tripCompatibilityScore =
+    uniqueRequesterTripIds.length > 0 ? 100 : 0
+
+  const compatibilityScore = Math.round(
+    tripCompatibilityScore * 0.55 +
+      averageTimeFitScore * 0.3 +
+      match.history_score_normalized * 100 * 0.15
+  )
+
+  let badge_label = 'Compatible'
+  let badge_tone: 'green' | 'yellow' | 'red' = 'yellow'
+
+  if (compatibilityScore >= 80) {
+    badge_label = 'Très compatible'
+    badge_tone = 'green'
+  } else if (compatibilityScore < 60) {
+    badge_label = 'À vérifier'
+    badge_tone = 'red'
+  }
+
+  return {
+    ...match,
+    compatibility_score: compatibilityScore,
+    trip_compatibility_score: tripCompatibilityScore,
+    average_time_fit_score: averageTimeFitScore,
+    coverage_ratio: coverageRatio,
+    matched_trip_count: match.trip_matches.length,
+    matched_requester_trip_count: uniqueRequesterTripIds.length,
+    covered_day_of_week_values: uniqueDayValues,
+    badge_label,
+    badge_tone,
+  }
+}
+
 export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
   const router = useRouter()
 
   const [familyId, setFamilyId] = useState('')
   const [children, setChildren] = useState<Child[]>([])
   const [trips, setTrips] = useState<Trip[]>([])
-  const [places, setPlaces] = useState<Place[]>([])
-  const [placeSuggestions, setPlaceSuggestions] = useState<PlaceSuggestion[]>([])
 
   const [step, setStep] = useState(1)
   const [results, setResults] = useState<FamilyMatch[]>([])
@@ -62,6 +114,12 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
   const [selectedTripIds, setSelectedTripIds] = useState<string[]>([])
   const [showAddChild, setShowAddChild] = useState(false)
   const [showAddTrip, setShowAddTrip] = useState(false)
+  const [scoreInfoFamilyId, setScoreInfoFamilyId] = useState<string | null>(null)
+
+  const [confirmState, setConfirmState] = useState<ConfirmState>({
+    open: false,
+    match: null,
+  })
 
   const [childFirstName, setChildFirstName] = useState('')
   const [childLevel, setChildLevel] = useState('')
@@ -105,17 +163,13 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
 
         setFamilyId(family.id)
 
-        const [childrenData, tripsData, placesData, suggestionsData] = await Promise.all([
+        const [childrenData, tripsData] = await Promise.all([
           loadChildren(family.id),
           loadTrips(family.id),
-          loadPlaces(),
-          loadPlaceSuggestions(),
         ])
 
         setChildren(childrenData)
         setTrips(tripsData)
-        setPlaces(placesData)
-        setPlaceSuggestions(suggestionsData)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erreur de chargement.')
       } finally {
@@ -145,14 +199,6 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
     setSelectedTripIds((prev) =>
       prev.includes(tripId) ? prev.filter((id) => id !== tripId) : [...prev, tripId]
     )
-  }
-
-  function selectAllTrips() {
-    setSelectedTripIds(selectedChildTrips.map((trip) => trip.id))
-  }
-
-  function clearAllTrips() {
-    setSelectedTripIds([])
   }
 
   function toggleDay(dayValue: number) {
@@ -214,9 +260,11 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
 
     await reloadChildren()
     setSelectedChildId(data.id)
+    setSelectedTripIds([])
     setChildFirstName('')
     setChildLevel('')
     setShowAddChild(false)
+    setStep(2)
     showPopup('Enfant ajouté.', 'success')
   }
 
@@ -230,7 +278,10 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
     }
 
     if (!fromPlaceId || !toPlaceId) {
-      showPopup('Veuillez sélectionner un départ et une destination dans la liste proposée.', 'error')
+      showPopup(
+        'Veuillez sélectionner un départ et une destination dans la liste proposée.',
+        'error'
+      )
       return
     }
 
@@ -309,13 +360,7 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
                 ),
               }))
               .filter((match) => match.trip_matches.length > 0)
-              .map((match) => ({
-                ...match,
-                matched_trip_count: match.trip_matches.length,
-                matched_requester_trip_count: Array.from(
-                  new Set(match.trip_matches.map((tripMatch) => tripMatch.requester_trip_id))
-                ).length,
-              }))
+              .map(recalculateFilteredMatch)
 
       setResults(filteredResults)
       setStep(3)
@@ -326,20 +371,27 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
     }
   }
 
-  async function handleRequestContact(match: FamilyMatch) {
+  function openConfirmPopup(match: FamilyMatch) {
+    setConfirmState({
+      open: true,
+      match,
+    })
+  }
+
+  function closeConfirmPopup() {
+    setConfirmState({
+      open: false,
+      match: null,
+    })
+  }
+
+  async function confirmRequestContact() {
+    const match = confirmState.match
+    if (!match) return
+
     const parentName =
       `${match.target_parent_first_name || ''} ${match.target_parent_last_name || ''}`.trim() ||
       'cette famille'
-
-    const confirmed = window.confirm(
-      `Envoyer une demande à ${parentName} ?
-
-Cette famille recevra votre demande et pourra vous répondre directement.
-
-Vous serez prévenu dès qu’une réponse sera donnée.`
-    )
-
-    if (!confirmed) return
 
     setError('')
 
@@ -361,26 +413,22 @@ Vous serez prévenu dès qu’une réponse sera donnée.`
         },
       })
 
+      closeConfirmPopup()
       showPopup(
         `Votre demande a bien été envoyée à ${parentName}. Nous vous informerons dès qu’une réponse sera donnée.`,
         'success'
       )
       setStep(4)
     } catch (err) {
+      closeConfirmPopup()
       const message =
         err instanceof Error ? err.message : 'Erreur lors de l’envoi de la demande.'
       showPopup(message, 'error')
     }
   }
 
-  function scoreExplanation(score: number) {
-    if (score >= 80) {
-      return 'Score estimé à partir des lieux, des horaires et de l’historique des échanges.'
-    }
-    if (score >= 60) {
-      return 'Compatibilité estimée à partir de la proximité des trajets et des horaires.'
-    }
-    return 'Compatibilité partielle selon les lieux, horaires et échanges précédents.'
+  function scoreExplanation() {
+    return 'Score estimé à partir de la proximité des lieux, des horaires et de l’historique des échanges entre familles.'
   }
 
   if (loading) {
@@ -394,6 +442,13 @@ Vous serez prévenu dès qu’une réponse sera donnée.`
       </main>
     )
   }
+
+  const confirmParentName =
+    confirmState.match
+      ? `${confirmState.match.target_parent_first_name || ''} ${
+          confirmState.match.target_parent_last_name || ''
+        }`.trim() || 'cette famille'
+      : ''
 
   return (
     <>
@@ -444,27 +499,39 @@ Vous serez prévenu dès qu’une réponse sera donnée.`
                   </div>
                 )}
 
-                <div className={styles.itemActions}>
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    onClick={() => setShowAddChild((prev) => !prev)}
-                  >
-                    {showAddChild ? 'Fermer' : 'Ajouter un enfant'}
-                  </button>
+                {!showAddChild ? (
+                  <div className={styles.itemActions}>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() => setShowAddChild(true)}
+                    >
+                      Ajouter un enfant
+                    </button>
 
-                  <button
-                    type="button"
-                    className={styles.primaryButton}
-                    disabled={!selectedChildId}
-                    onClick={() => setStep(2)}
-                  >
-                    Suivant
-                  </button>
-                </div>
+                    <button
+                      type="button"
+                      className={styles.primaryButton}
+                      disabled={!selectedChildId}
+                      onClick={() => setStep(2)}
+                    >
+                      Suivant
+                    </button>
+                  </div>
+                ) : null}
 
                 {showAddChild ? (
                   <div style={{ marginTop: 18 }}>
+                    <div className={styles.itemActions} style={{ marginBottom: 12 }}>
+                      <button
+                        type="button"
+                        className={styles.secondaryButton}
+                        onClick={() => setShowAddChild(false)}
+                      >
+                        Fermer
+                      </button>
+                    </div>
+
                     <form onSubmit={handleAddChild} className={styles.form}>
                       <div className={styles.fieldRow}>
                         <div className={styles.field}>
@@ -508,70 +575,71 @@ Vous serez prévenu dès qu’une réponse sera donnée.`
                     Aucun trajet en recherche pour cet enfant.
                   </p>
                 ) : (
-                  <>
-                    <div className={styles.itemActions}>
-                      <button type="button" className={styles.secondaryButton} onClick={selectAllTrips}>
-                        Tout sélectionner
-                      </button>
-                      <button type="button" className={styles.secondaryButton} onClick={clearAllTrips}>
-                        Tout désélectionner
-                      </button>
-                    </div>
-
-                    <div className={styles.itemList} style={{ marginTop: 14 }}>
-                      {selectedChildTrips.map((trip) => (
-                        <label key={trip.id} className={styles.itemCard} style={{ cursor: 'pointer' }}>
-                          <input
-                            type="checkbox"
-                            checked={selectedTripIds.includes(trip.id)}
-                            onChange={() => toggleTripSelection(trip.id)}
-                            style={{ marginRight: 10 }}
-                          />
-                          <strong>{formatSingleDay(trip.day_of_week)}</strong>
-                          <div className={styles.itemBody} style={{ marginTop: 8 }}>
-                            <p>
-                              <strong>Horaire :</strong> {formatTimeValue(trip.from_time)}
-                            </p>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </>
+                  <div className={styles.itemList}>
+                    {selectedChildTrips.map((trip) => (
+                      <label key={trip.id} className={styles.itemCard} style={{ cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedTripIds.includes(trip.id)}
+                          onChange={() => toggleTripSelection(trip.id)}
+                          style={{ marginRight: 10 }}
+                        />
+                        <strong>{formatSingleDay(trip.day_of_week)}</strong>
+                        <div className={styles.itemBody} style={{ marginTop: 8 }}>
+                          <p>
+                            <strong>Horaire :</strong> {formatTimeValue(trip.from_time)}
+                          </p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
                 )}
 
-                <div className={styles.itemActions}>
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    onClick={() => setStep(1)}
-                  >
-                    Précédent
-                  </button>
+                {!showAddTrip ? (
+                  <div className={styles.itemActions}>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() => setStep(1)}
+                    >
+                      Précédent
+                    </button>
 
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    onClick={() => setShowAddTrip((prev) => !prev)}
-                  >
-                    {showAddTrip ? 'Fermer' : 'Ajouter un trajet'}
-                  </button>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() => setShowAddTrip(true)}
+                    >
+                      Ajouter un trajet
+                    </button>
 
-                  <Link href="/dashboard/trips" className={styles.secondaryButton}>
-                    Modifier un trajet
-                  </Link>
+                    <Link href="/dashboard/trips" className={styles.secondaryButton}>
+                      Modifier un trajet
+                    </Link>
 
-                  <button
-                    type="button"
-                    className={styles.primaryButton}
-                    onClick={launchMatching}
-                    disabled={selectedTripIds.length === 0 || loadingMatching}
-                  >
-                    {loadingMatching ? 'Recherche...' : 'Lancer la recherche'}
-                  </button>
-                </div>
+                    <button
+                      type="button"
+                      className={styles.primaryButton}
+                      onClick={launchMatching}
+                      disabled={selectedTripIds.length === 0 || loadingMatching}
+                    >
+                      {loadingMatching ? 'Recherche...' : 'Lancer la recherche'}
+                    </button>
+                  </div>
+                ) : null}
 
                 {showAddTrip ? (
                   <div style={{ marginTop: 20 }}>
+                    <div className={styles.itemActions} style={{ marginBottom: 12 }}>
+                      <button
+                        type="button"
+                        className={styles.secondaryButton}
+                        onClick={() => setShowAddTrip(false)}
+                      >
+                        Fermer
+                      </button>
+                    </div>
+
                     <form onSubmit={handleAddTrip} className={styles.form}>
                       <div className={styles.field}>
                         <label>Enfant</label>
@@ -686,6 +754,7 @@ Vous serez prévenu dès qu’une réponse sera donnée.`
                             id="fromTime"
                             type="time"
                             className={styles.input}
+                            style={{ width: '100%', minHeight: 48 }}
                             value={fromTime}
                             onChange={(e) => setFromTime(e.target.value)}
                             required
@@ -723,14 +792,18 @@ Vous serez prévenu dès qu’une réponse sera donnée.`
 
                 {results.length === 0 ? (
                   <p className={styles.statusMessage}>
-                    Aucun parent compatible trouvé pour le moment. On vous tiendra au courant dès qu’un trajet compatible sera disponible.
+                    Aucun parent compatible trouvé pour le moment. On vous tiendra au courant dès
+                    qu’un trajet compatible sera disponible.
                   </p>
                 ) : (
                   <div className={styles.itemList}>
                     {results.map((match) => {
                       const parentName =
-                        `${match.target_parent_first_name || ''} ${match.target_parent_last_name || ''}`.trim() ||
-                        'Famille compatible'
+                        `${match.target_parent_first_name || ''} ${
+                          match.target_parent_last_name || ''
+                        }`.trim() || 'Famille compatible'
+
+                      const isScoreInfoOpen = scoreInfoFamilyId === match.target_family_id
 
                       return (
                         <div key={match.target_family_id} className={styles.itemCard}>
@@ -740,13 +813,30 @@ Vous serez prévenu dès qu’une réponse sera donnée.`
                               <p className={styles.itemMeta}>Historique : {match.history_label}</p>
                             </div>
 
-                            <span
-                              className={styles.badgeGreen}
-                              title={scoreExplanation(match.compatibility_score)}
-                            >
-                              {match.compatibility_score}% ⓘ
-                            </span>
+                            <div style={{ textAlign: 'right' }}>
+                              <button
+                                type="button"
+                                className={styles.badgeGreen}
+                                onClick={() =>
+                                  setScoreInfoFamilyId((prev) =>
+                                    prev === match.target_family_id ? null : match.target_family_id
+                                  )
+                                }
+                                style={{
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                {match.compatibility_score}% ⓘ
+                              </button>
+                            </div>
                           </div>
+
+                          {isScoreInfoOpen ? (
+                            <p className={styles.smallMuted} style={{ marginBottom: 12 }}>
+                              {scoreExplanation()}
+                            </p>
+                          ) : null}
 
                           <div className={styles.itemBody}>
                             <p>Trajets compatibles : {match.matched_requester_trip_count}</p>
@@ -762,14 +852,21 @@ Vous serez prévenu dès qu’une réponse sera donnée.`
                                 <p>
                                   <strong>{formatSingleDay(tripMatch.day_of_week)}</strong>
                                 </p>
-                                <p>Enfant : {tripMatch.requester_child_first_name || '—'}</p>
-                                <p>Départ : {tripMatch.requester_from_label}</p>
-                                <p>Destination : {tripMatch.requester_to_label}</p>
                                 <p>
-                                  Votre horaire : {formatTimeValue(tripMatch.requester_from_time)}
+                                  <strong>Enfant</strong> : {tripMatch.requester_child_first_name || '—'}
                                 </p>
                                 <p>
-                                  Horaire de l’autre famille : {formatTimeValue(tripMatch.target_from_time)}
+                                  <strong>Départ</strong> : {tripMatch.requester_from_label}
+                                </p>
+                                <p>
+                                  <strong>Arrivée</strong> : {tripMatch.requester_to_label}
+                                </p>
+                                <p>
+                                  <strong>Vous</strong> : {formatTimeValue(tripMatch.requester_from_time)}
+                                </p>
+                                <p>
+                                  <strong>Autre famille</strong> :{' '}
+                                  {formatTimeValue(tripMatch.target_from_time)}
                                 </p>
                               </div>
                             ))}
@@ -779,7 +876,7 @@ Vous serez prévenu dès qu’une réponse sera donnée.`
                             <button
                               type="button"
                               className={styles.primaryButton}
-                              onClick={() => handleRequestContact(match)}
+                              onClick={() => openConfirmPopup(match)}
                             >
                               Demander la mise en relation
                             </button>
@@ -806,7 +903,8 @@ Vous serez prévenu dès qu’une réponse sera donnée.`
               <div className={styles.sectionCard}>
                 <h2 className={styles.sectionTitle}>Suite</h2>
                 <p className={styles.sectionText}>
-                  Votre demande a bien été envoyée. Vous pouvez suivre son évolution dans vos demandes.
+                  Votre demande a bien été envoyée. Vous pouvez suivre son évolution dans vos
+                  demandes.
                 </p>
 
                 <div className={styles.itemActions}>
@@ -828,6 +926,69 @@ Vous serez prévenu dès qu’une réponse sera donnée.`
             ) : null}
           </div>
         </section>
+
+        {confirmState.open ? (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(15, 23, 42, 0.38)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 20,
+              zIndex: 9999,
+            }}
+          >
+            <div
+              style={{
+                width: '100%',
+                maxWidth: 440,
+                background: '#ffffff',
+                borderRadius: 18,
+                padding: '24px 22px',
+                boxShadow: '0 24px 60px rgba(15, 23, 42, 0.24)',
+                border: '1px solid #dbe8f5',
+              }}
+            >
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 16,
+                  lineHeight: 1.7,
+                  color: '#17396a',
+                }}
+              >
+                Envoyer une demande de mise en relation à <strong>{confirmParentName}</strong> ?
+              </p>
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: 10,
+                  marginTop: 20,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={closeConfirmPopup}
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  onClick={confirmRequestContact}
+                >
+                  Envoyer
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </main>
     </>
   )
