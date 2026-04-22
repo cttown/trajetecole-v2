@@ -1,6 +1,6 @@
 import Head from 'next/head'
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import styles from '../../styles/Dashboard.module.css'
 import {
@@ -8,12 +8,11 @@ import {
   ContactRequestListItem,
   PlaceSuggestion,
   Trip,
-  isTripReadyForMatching,
-  requireFamily,
   loadChildren,
   loadTrips,
   loadPlaceSuggestions,
   loadContactRequests,
+  requireFamily,
 } from '../../lib/dashboardShared'
 import { trackEvent } from '../../lib/trackEvent'
 
@@ -69,28 +68,6 @@ export default function DashboardHomePage() {
     loadPage()
   }, [router])
 
-  const searchingTrips = trips.filter((trip) => trip.status === 'searching')
-  const readyTrips = trips.filter((trip) => isTripReadyForMatching(trip))
-  const pendingReceived = receivedRequests.filter((item) => item.status === 'pending')
-  const pendingSent = sentRequests.filter((item) => item.status === 'pending')
-  const acceptedSent = sentRequests.filter(
-    (item) => item.status === 'accepted' || item.status === 'closed_with_agreement'
-  )
-  const pendingSuggestions = suggestions.filter((item) => item.status === 'pending')
-
-  const nextStep = useMemo(() => {
-    if (children.length === 0) {
-      return 'Ajoutez au moins un enfant.'
-    }
-    if (trips.length === 0) {
-      return 'Ajoutez votre premier trajet.'
-    }
-    if (readyTrips.length === 0) {
-      return 'Complétez un trajet pour lancer la recherche.'
-    }
-    return 'Vos informations sont prêtes.'
-  }, [children.length, trips.length, readyTrips.length])
-
   if (loading) {
     return (
       <main className={styles.page}>
@@ -129,63 +106,21 @@ export default function DashboardHomePage() {
 
             {error ? <p className={styles.errorMessage}>{error}</p> : null}
 
-            <div className={styles.heroCard}>
-              <h2 className={styles.heroTitle}>Trouver une correspondance</h2>
-              <div className={styles.heroActions}>
-                <Link href="/dashboard/find-match" className={styles.primaryButton}>
-                  Lancer la recherche
-                </Link>
-              </div>
-            </div>
-
-            <div className={styles.grid4}>
-              <div className={styles.summaryCard}>
-                <p className={styles.summaryLabel}>Enfants</p>
-                <p className={styles.summaryValue}>{children.length}</p>
-              </div>
-
-              <div className={styles.summaryCard}>
-                <p className={styles.summaryLabel}>Trajets</p>
-                <p className={styles.summaryValue}>{trips.length}</p>
-              </div>
-
-              <div className={styles.summaryCard}>
-                <p className={styles.summaryLabel}>Demandes reçues</p>
-                <p className={styles.summaryValue}>{pendingReceived.length}</p>
-              </div>
-
-              <div className={styles.summaryCard}>
-                <p className={styles.summaryLabel}>Lieux à valider</p>
-                <p className={styles.summaryValue}>{pendingSuggestions.length}</p>
-              </div>
-            </div>
-
             <div className={styles.sectionCard}>
               <div className={styles.sectionHeader}>
                 <div>
-                  <h2 className={styles.sectionTitle}>Progression actuelle</h2>
-                  <p className={styles.sectionText}>{nextStep}</p>
+                  <h2 className={styles.sectionTitle}>Trouver une correspondance</h2>
                 </div>
               </div>
 
-              <div className={styles.grid2}>
-                <div className={styles.itemCard}>
-                  <h3 className={styles.itemTitle}>Compte</h3>
-                  <div className={styles.itemBody}>
-                    <p>Enfants : {children.length}</p>
-                    <p>Trajets : {trips.length}</p>
-                    <p>Trajets prêts : {readyTrips.length}</p>
-                  </div>
-                </div>
+              <div className={styles.itemBody}>
+                <p>Choisissez un enfant, sélectionnez les trajets à rechercher, puis lancez la recherche.</p>
+              </div>
 
-                <div className={styles.itemCard}>
-                  <h3 className={styles.itemTitle}>Demandes</h3>
-                  <div className={styles.itemBody}>
-                    <p>Reçues en attente : {pendingReceived.length}</p>
-                    <p>Envoyées en attente : {pendingSent.length}</p>
-                    <p>Acceptées : {acceptedSent.length}</p>
-                  </div>
-                </div>
+              <div className={styles.itemActions}>
+                <Link href="/dashboard/find-match" className={styles.primaryButton}>
+                  Commencer
+                </Link>
               </div>
             </div>
 
@@ -216,53 +151,17 @@ export default function DashboardHomePage() {
                 <Link href="/dashboard/places" className={styles.quickLinkCard}>
                   <h3 className={styles.quickLinkTitle}>Lieux</h3>
                 </Link>
-
-                <Link href="/dashboard/find-match" className={styles.quickLinkCard}>
-                  <h3 className={styles.quickLinkTitle}>Recherche</h3>
-                </Link>
               </div>
             </div>
 
             <div className={styles.sectionCard}>
-              <div className={styles.sectionHeader}>
-                <div>
-                  <h2 className={styles.sectionTitle}>Recherche</h2>
-                </div>
+              <div className={styles.itemBody}>
+                <p>
+                  Enfants : <strong>{children.length}</strong> · Trajets : <strong>{trips.length}</strong> ·
+                  Demandes reçues : <strong>{receivedRequests.length}</strong> · Suggestions de lieux :{' '}
+                  <strong>{suggestions.length}</strong> · Demandes envoyées : <strong>{sentRequests.length}</strong>
+                </p>
               </div>
-
-              <div className={styles.itemActions}>
-                <Link href="/dashboard/find-match" className={styles.primaryButton}>
-                  Trouver une correspondance
-                </Link>
-              </div>
-            </div>
-
-            <div className={styles.sectionCard}>
-              <div className={styles.sectionHeader}>
-                <div>
-                  <h2 className={styles.sectionTitle}>Raccourcis utiles</h2>
-                </div>
-              </div>
-
-              <div className={styles.itemActions}>
-                <Link href="/dashboard/children" className={styles.secondaryButton}>
-                  Enfants
-                </Link>
-                <Link href="/dashboard/trips" className={styles.secondaryButton}>
-                  Trajets
-                </Link>
-                <Link href="/dashboard/requests" className={styles.secondaryButton}>
-                  Demandes
-                </Link>
-                <Link href="/dashboard/places" className={styles.secondaryButton}>
-                  Lieux
-                </Link>
-              </div>
-            </div>
-
-            <div className={styles.statusMessage}>
-              Pour une demande déjà envoyée sur un même trajet, un nouveau contact ne sera possible
-              qu’après le délai de priorité.
             </div>
           </div>
         </section>

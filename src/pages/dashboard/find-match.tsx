@@ -1,6 +1,6 @@
 import Head from 'next/head'
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
 import styles from '../../styles/Dashboard.module.css'
 import {
@@ -10,8 +10,7 @@ import {
   createContactRequest,
   formatDayValues,
   formatSingleDay,
-  getTripBlockingReason,
-  isTripReadyForMatching,
+  formatTimeValue,
   loadChildren,
   loadPlaces,
   loadPlaceSuggestions,
@@ -21,21 +20,37 @@ import {
   Place,
   PlaceSuggestion,
 } from '../../lib/dashboardShared'
+import { supabase } from '../../lib/supabaseClient'
 import { trackEvent } from '../../lib/trackEvent'
+import type { SetGlobalPopup } from '../_app'
 
-export default function DashboardFindMatchPage() {
+type Props = {
+  setGlobalPopup?: SetGlobalPopup
+}
+
+export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
   const router = useRouter()
 
+  const [familyId, setFamilyId] = useState('')
   const [children, setChildren] = useState<Child[]>([])
   const [trips, setTrips] = useState<Trip[]>([])
   const [places, setPlaces] = useState<Place[]>([])
   const [placeSuggestions, setPlaceSuggestions] = useState<PlaceSuggestion[]>([])
+
   const [step, setStep] = useState(1)
   const [results, setResults] = useState<FamilyMatch[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMatching, setLoadingMatching] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+
+  const [selectedChildId, setSelectedChildId] = useState('')
+  const [selectedTripIds, setSelectedTripIds] = useState<string[]>([])
+  const [showAddChild, setShowAddChild] = useState(false)
+  const [showHelpText, setShowHelpText] = useState(false)
+
+  const [childFirstName, setChildFirstName] = useState('')
+  const [childLevel, setChildLevel] = useState('')
+  const [savingChild, setSavingChild] = useState(false)
 
   useEffect(() => {
     trackEvent({
@@ -50,6 +65,8 @@ export default function DashboardFindMatchPage() {
       try {
         const { family } = await requireFamily(router)
         if (!family) return
+
+        setFamilyId(family.id)
 
         const [childrenData, tripsData, placesData, suggestionsData] = await Promise.all([
           loadChildren(family.id),
@@ -72,13 +89,6 @@ export default function DashboardFindMatchPage() {
     loadPage()
   }, [router])
 
-  const readyTrips = useMemo(() => trips.filter((trip) => isTripReadyForMatching(trip)), [trips])
-
-  const childMap = useMemo(
-    () => Object.fromEntries(children.map((child) => [child.id, child])),
-    [children]
-  )
-
   const placeMap = useMemo(
     () => Object.fromEntries(places.map((place) => [place.id, place])),
     [places]
@@ -89,10 +99,21 @@ export default function DashboardFindMatchPage() {
     [placeSuggestions]
   )
 
-  const searchingTrips = trips.filter((trip) => trip.status === 'searching')
-  const resolvedTrips = trips.filter((trip) => trip.status === 'resolved')
-  const pausedTrips = trips.filter((trip) => trip.status === 'paused')
-  const archivedTrips = trips.filter((trip) => trip.status === 'archived')
+  const selectedChildTrips = useMemo(() => {
+    if (!selectedChildId) return []
+    return trips.filter((trip) => trip.child_id === selectedChildId && trip.status === 'searching')
+  }, [selectedChildId, trips])
+
+  function showPopup(message: string, type: 'success' | 'error' = 'success') {
+    if (setGlobalPopup) {
+      setGlobalPopup({ message, type })
+      return
+    }
+
+    if (type === 'error') {
+      setError(message)
+    }
+  }
 
   function placeLabel(placeId: string | null, suggestionId?: string | null) {
     if (placeId) {
@@ -116,14 +137,71 @@ export default function DashboardFindMatchPage() {
     return 'Peu compatible'
   }
 
+  function toggleTripSelection(tripId: string) {
+    setSelectedTripIds((prev) =>
+      prev.includes(tripId) ? prev.filter((id) => id !== tripId) : [...prev, tripId]
+    )
+  }
+
+  async function handleAddChild(e: FormEvent) {
+    e.preventDefault()
+    setError('')
+
+    if (!familyId) return
+    if (!childFirstName.trim()) {
+      showPopup('Le prénom de l’enfant est obligatoire.', 'error')
+      return
+    }
+
+    setSavingChild(true)
+
+    const { data, error } = await supabase
+      .from('children')
+      .insert({
+        family_id: familyId,
+        first_name: childFirstName.trim(),
+        level: childLevel.trim() || null,
+      })
+      .select()
+      .single()
+
+    setSavingChild(false)
+
+    if (error) {
+      showPopup(error.message, 'error')
+      return
+    }
+
+    setChildren((prev) => [...prev, data])
+    setSelectedChildId(data.id)
+    setChildFirstName('')
+    setChildLevel('')
+    setShowAddChild(false)
+    showPopup('Enfant ajouté.', 'success')
+  }
+
   async function launchMatching() {
     setError('')
-    setSuccess('')
     setLoadingMatching(true)
 
     try {
-      const data = await runFamilyMatchingRequest()
-      setResults(data)
+      const allResults = await runFamilyMatchingRequest()
+
+      if (selectedTripIds.length === 0) {
+        setResults(allResults)
+      } else {
+        const filteredResults = allResults
+          .map((match) => ({
+            ...match,
+            trip_matches: match.trip_matches.filter((tripMatch) =>
+              selectedTripIds.includes(tripMatch.requester_trip_id)
+            ),
+          }))
+          .filter((match) => match.trip_matches.length > 0)
+
+        setResults(filteredResults)
+      }
+
       setStep(3)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la recherche.')
@@ -140,18 +218,18 @@ export default function DashboardFindMatchPage() {
     const confirmed = window.confirm(
       `Envoyer une demande à ${parentName} ?
 
-Le parent recevra votre demande et pourra accepter ou refuser.
-
-👉 Vous pourrez refaire une demande plus tard si besoin.`
+Le parent recevra votre demande et pourra accepter ou refuser.`
     )
 
     if (!confirmed) return
 
     setError('')
-    setSuccess('')
 
     try {
-      const requesterTripIds = match.trip_matches.map((item) => item.requester_trip_id)
+      const requesterTripIds = Array.from(
+        new Set(match.trip_matches.map((item) => item.requester_trip_id))
+      )
+
       await createContactRequest(match.target_family_id, requesterTripIds)
 
       trackEvent({
@@ -165,70 +243,16 @@ Le parent recevra votre demande et pourra accepter ou refuser.
         },
       })
 
-      setSuccess(
-        'Votre demande a été envoyée ✅ Le parent a été notifié et peut vous répondre rapidement. Vous serez informé par email.'
+      showPopup(
+        'Votre demande a été envoyée. Vous serez informé dès que l’autre parent répond.',
+        'success'
       )
       setStep(4)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors de l’envoi de la demande.')
+      const message =
+        err instanceof Error ? err.message : 'Erreur lors de l’envoi de la demande.'
+      showPopup(message, 'error')
     }
-  }
-
-  function TripList({
-    title,
-    items,
-    openByDefault,
-  }: {
-    title: string
-    items: Trip[]
-    openByDefault?: boolean
-  }) {
-    return (
-      <details className={styles.accordion} open={openByDefault}>
-        <summary className={styles.accordionSummary}>
-          {title} ({items.length})
-        </summary>
-        <div className={styles.accordionBody}>
-          {items.length === 0 ? (
-            <p className={styles.smallMuted}>Aucun trajet dans cette catégorie.</p>
-          ) : (
-            items.map((trip) => {
-              const child = childMap[trip.child_id]
-              const ready = isTripReadyForMatching(trip)
-              const reason = ready
-                ? 'Pris en compte dans la recherche.'
-                : getTripBlockingReason(trip) || 'Non pris en compte.'
-
-              return (
-                <div key={trip.id} className={styles.itemCard} style={{ padding: 14 }}>
-                  <div className={styles.itemBody}>
-                    <p>
-                      <strong>Enfant :</strong> {child?.first_name || '—'}
-                    </p>
-                    <p>
-                      <strong>Jour :</strong> {formatSingleDay(trip.day_of_week)}
-                    </p>
-                    <p>
-                      <strong>Horaires :</strong> {trip.from_time}
-                      {trip.to_time ? ` → ${trip.to_time}` : ''}
-                    </p>
-                    <p>
-                      <strong>Départ :</strong>{' '}
-                      {placeLabel(trip.from_place_id, trip.from_place_suggestion_id)}
-                    </p>
-                    <p>
-                      <strong>Destination :</strong>{' '}
-                      {placeLabel(trip.to_place_id, trip.to_place_suggestion_id)}
-                    </p>
-                    <p className={styles.smallMuted}>{reason}</p>
-                  </div>
-                </div>
-              )
-            })
-          )}
-        </div>
-      </details>
-    )
   }
 
   if (loading) {
@@ -256,109 +280,144 @@ Le parent recevra votre demande et pourra accepter ou refuser.
               <div>
                 <h1 className={styles.pageTitle}>Trouver une correspondance</h1>
                 <p className={styles.pageIntro}>
-                  Suivez les étapes pour vérifier vos informations et trouver des parents
-                  compatibles avec vos trajets.
+                  Choisissez un enfant, sélectionnez les trajets à rechercher, puis consultez les familles compatibles.
                 </p>
               </div>
               <div className={styles.topbarActions}>
                 <Link href="/dashboard" className={styles.secondaryButton}>
-                  Retour dashboard
+                  Retour Mon espace
                 </Link>
               </div>
             </div>
 
             <div className={styles.stepper}>
-              <div className={step === 1 ? styles.stepPillActive : styles.stepPill}>1. Enfants</div>
+              <div className={step === 1 ? styles.stepPillActive : styles.stepPill}>1. Enfant</div>
               <div className={step === 2 ? styles.stepPillActive : styles.stepPill}>2. Trajets</div>
-              <div className={step === 3 ? styles.stepPillActive : styles.stepPill}>
-                3. Résultats
-              </div>
+              <div className={step === 3 ? styles.stepPillActive : styles.stepPill}>3. Résultats</div>
               <div className={step === 4 ? styles.stepPillActive : styles.stepPill}>4. Suite</div>
             </div>
 
             {error ? <p className={styles.errorMessage}>{error}</p> : null}
-            {success ? <p className={styles.successMessage}>{success}</p> : null}
 
             {step === 1 ? (
               <div className={styles.sectionCard}>
-                <h2 className={styles.sectionTitle}>Étape 1 — Enfants</h2>
-                <p className={styles.sectionText}>
-                  Vérifiez que vous avez bien au moins un enfant enregistré avant de continuer.
-                </p>
+                <h2 className={styles.sectionTitle}>Étape 1 — Sélectionner un enfant</h2>
 
                 {children.length === 0 ? (
-                  <p className={styles.statusMessage}>
-                    Ajoutez au moins un enfant pour commencer la recherche.
-                  </p>
+                  <p className={styles.statusMessage}>Aucun enfant enregistré.</p>
                 ) : (
                   <div className={styles.itemList}>
                     {children.map((child) => (
-                      <div key={child.id} className={styles.itemCard}>
-                        <h3 className={styles.itemTitle}>{child.first_name}</h3>
-                        <p className={styles.itemMeta}>Niveau : {child.level || '—'}</p>
-                      </div>
+                      <label key={child.id} className={styles.itemCard} style={{ cursor: 'pointer' }}>
+                        <input
+                          type="radio"
+                          name="selected-child"
+                          checked={selectedChildId === child.id}
+                          onChange={() => {
+                            setSelectedChildId(child.id)
+                            setSelectedTripIds([])
+                          }}
+                          style={{ marginRight: 10 }}
+                        />
+                        <strong>{child.first_name}</strong>
+                        {child.level ? <span style={{ marginLeft: 8 }}>· {child.level}</span> : null}
+                      </label>
                     ))}
                   </div>
                 )}
 
                 <div className={styles.itemActions}>
-                  <Link href="/dashboard/children?from=find-match" className={styles.secondaryButton}>
-                    Gérer mes enfants
-                  </Link>
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    onClick={() => setShowAddChild((prev) => !prev)}
+                  >
+                    {showAddChild ? 'Fermer' : 'Ajouter un enfant'}
+                  </button>
+
                   <button
                     type="button"
                     className={styles.primaryButton}
-                    disabled={children.length === 0}
+                    disabled={!selectedChildId}
                     onClick={() => setStep(2)}
                   >
                     Suivant
                   </button>
                 </div>
+
+                {showAddChild ? (
+                  <div style={{ marginTop: 18 }}>
+                    <form onSubmit={handleAddChild} className={styles.form}>
+                      <div className={styles.fieldRow}>
+                        <div className={styles.field}>
+                          <label htmlFor="childFirstName">Prénom</label>
+                          <input
+                            id="childFirstName"
+                            value={childFirstName}
+                            onChange={(e) => setChildFirstName(e.target.value)}
+                            required
+                          />
+                        </div>
+
+                        <div className={styles.field}>
+                          <label htmlFor="childLevel">Niveau / classe</label>
+                          <input
+                            id="childLevel"
+                            value={childLevel}
+                            onChange={(e) => setChildLevel(e.target.value)}
+                            placeholder="Ex : CE2, 6e, CM1..."
+                          />
+                        </div>
+                      </div>
+
+                      <div className={styles.itemActions}>
+                        <button className={styles.primaryButton} disabled={savingChild}>
+                          {savingChild ? 'Ajout...' : 'Ajouter un enfant'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
             {step === 2 ? (
               <div className={styles.sectionCard}>
-                <h2 className={styles.sectionTitle}>Étape 2 — Trajets</h2>
-                <p className={styles.sectionText}>
-                  Vérifiez vos trajets existants ou ajoutez-en un nouveau. Seuls les trajets
-                  complets et en statut “Recherche” seront pris en compte.
-                </p>
+                <h2 className={styles.sectionTitle}>Étape 2 — Sélectionner les trajets</h2>
 
-                <div className={styles.grid3}>
-                  <div className={styles.summaryCard}>
-                    <p className={styles.summaryLabel}>Trajets en recherche</p>
-                    <p className={styles.summaryValue}>{searchingTrips.length}</p>
-                  </div>
-                  <div className={styles.summaryCard}>
-                    <p className={styles.summaryLabel}>Prêts pour la recherche</p>
-                    <p className={styles.summaryValue}>{readyTrips.length}</p>
-                  </div>
-                  <div className={styles.summaryCard}>
-                    <p className={styles.summaryLabel}>Autres statuts</p>
-                    <p className={styles.summaryValue}>
-                      {resolvedTrips.length + pausedTrips.length + archivedTrips.length}
-                    </p>
-                  </div>
-                </div>
-
-                <div className={styles.accordionGroup}>
-                  <TripList title="Trajets en recherche" items={searchingTrips} openByDefault />
-                  <TripList title="Trajets résolus" items={resolvedTrips} />
-                  <TripList title="Trajets en pause" items={pausedTrips} />
-                  <TripList title="Trajets archivés" items={archivedTrips} />
-                </div>
-
-                {readyTrips.length === 0 ? (
+                {selectedChildTrips.length === 0 ? (
                   <p className={styles.statusMessage}>
-                    Aucun trajet prêt pour la recherche.
-                    <br />
-                    <br />
-                    Vérifiez que vos trajets :
-                    <br />• sont en statut "Recherche"
-                    <br />• ont un départ et une destination validés
+                    Aucun trajet en recherche pour cet enfant.
                   </p>
-                ) : null}
+                ) : (
+                  <div className={styles.itemList}>
+                    {selectedChildTrips.map((trip) => (
+                      <label key={trip.id} className={styles.itemCard} style={{ cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedTripIds.includes(trip.id)}
+                          onChange={() => toggleTripSelection(trip.id)}
+                          style={{ marginRight: 10 }}
+                        />
+                        <strong>{formatSingleDay(trip.day_of_week)}</strong>
+                        <div className={styles.itemBody} style={{ marginTop: 8 }}>
+                          <p>
+                            <strong>Horaire :</strong> {formatTimeValue(trip.from_time)}
+                            {trip.to_time ? ` → ${formatTimeValue(trip.to_time)}` : ''}
+                          </p>
+                          <p>
+                            <strong>Départ :</strong>{' '}
+                            {placeLabel(trip.from_place_id, trip.from_place_suggestion_id)}
+                          </p>
+                          <p>
+                            <strong>Destination :</strong>{' '}
+                            {placeLabel(trip.to_place_id, trip.to_place_suggestion_id)}
+                          </p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
 
                 <div className={styles.itemActions}>
                   <button
@@ -368,20 +427,34 @@ Le parent recevra votre demande et pourra accepter ou refuser.
                   >
                     Précédent
                   </button>
-                  <Link href="/dashboard/trips?from=find-match" className={styles.secondaryButton}>
-                    Gérer mes trajets
+
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    onClick={() => setShowHelpText((prev) => !prev)}
+                  >
+                    Ajouter un trajet
+                  </button>
+
+                  <Link href="/dashboard/trips" className={styles.secondaryButton}>
+                    Modifier un trajet
                   </Link>
+
                   <button
                     type="button"
                     className={styles.primaryButton}
                     onClick={launchMatching}
-                    disabled={readyTrips.length === 0 || loadingMatching}
+                    disabled={selectedTripIds.length === 0 || loadingMatching}
                   >
-                    {loadingMatching
-                      ? 'Recherche des parents compatibles...'
-                      : 'Trouver un parent'}
+                    {loadingMatching ? 'Recherche...' : 'Lancer la recherche'}
                   </button>
                 </div>
+
+                {showHelpText ? (
+                  <p className={styles.statusMessage}>
+                    Pour ajouter un trajet, ouvrez la page Trajets puis revenez ici.
+                  </p>
+                ) : null}
               </div>
             ) : null}
 
@@ -392,11 +465,6 @@ Le parent recevra votre demande et pourra accepter ou refuser.
                 {results.length === 0 ? (
                   <p className={styles.statusMessage}>
                     Aucun parent compatible trouvé pour le moment.
-                    <br />
-                    <br />
-                    👉 Vous pouvez :
-                    <br />• modifier vos trajets pour élargir la recherche
-                    <br />• revenir plus tard, de nouveaux parents peuvent s’inscrire
                   </p>
                 ) : (
                   <div className={styles.itemList}>
@@ -413,12 +481,12 @@ Le parent recevra votre demande et pourra accepter ou refuser.
                             </p>
                           </div>
                           <span className={styles.badgeGreen}>
-                            {getCompatibilityLabel(match.compatibility_score)} (
-                            {match.compatibility_score}/100)
+                            {getCompatibilityLabel(match.compatibility_score)} ({match.compatibility_score}%)
                           </span>
                         </div>
 
                         <div className={styles.itemBody}>
+                          <p>Nom de l’autre famille : {`${match.target_parent_first_name || ''} ${match.target_parent_last_name || ''}`.trim() || '—'}</p>
                           <p>Historique : {match.history_label}</p>
                           <p>Trajets compatibles : {match.matched_requester_trip_count}</p>
                         </div>
@@ -437,14 +505,16 @@ Le parent recevra votre demande et pourra accepter ou refuser.
                               <p>Départ : {tripMatch.requester_from_label}</p>
                               <p>Destination : {tripMatch.requester_to_label}</p>
                               <p>
-                                Horaires : {tripMatch.requester_from_time}
+                                Votre horaire : {formatTimeValue(tripMatch.requester_from_time)}
                                 {tripMatch.requester_to_time
-                                  ? ` → ${tripMatch.requester_to_time}`
+                                  ? ` → ${formatTimeValue(tripMatch.requester_to_time)}`
                                   : ''}
                               </p>
                               <p>
-                                Autre famille : {tripMatch.target_from_time}
-                                {tripMatch.target_to_time ? ` → ${tripMatch.target_to_time}` : ''}
+                                Horaire de l’autre famille : {formatTimeValue(tripMatch.target_from_time)}
+                                {tripMatch.target_to_time
+                                  ? ` → ${formatTimeValue(tripMatch.target_to_time)}`
+                                  : ''}
                               </p>
                             </div>
                           ))}
@@ -480,15 +550,7 @@ Le parent recevra votre demande et pourra accepter ou refuser.
               <div className={styles.sectionCard}>
                 <h2 className={styles.sectionTitle}>Étape 4 — Suite</h2>
                 <p className={styles.sectionText}>
-                  Votre demande a bien été envoyée.
-                  <br />
-                  <br />
-                  👉 Le parent va recevoir votre demande et peut y répondre rapidement.
-                  Vous serez informé dès qu’il répond.
-                </p>
-
-                <p className={styles.statusMessage}>
-                  Vous pouvez suivre l’état de votre demande dans votre espace personnel.
+                  Votre demande a bien été envoyée. Vous pouvez suivre son évolution dans vos demandes.
                 </p>
 
                 <div className={styles.itemActions}>
@@ -503,7 +565,7 @@ Le parent recevra votre demande et pourra accepter ou refuser.
                     Retour aux résultats
                   </button>
                   <Link href="/dashboard" className={styles.secondaryButton}>
-                    Retour dashboard
+                    Retour Mon espace
                   </Link>
                 </div>
               </div>

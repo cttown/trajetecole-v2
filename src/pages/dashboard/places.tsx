@@ -4,6 +4,11 @@ import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { supabase } from '../../lib/supabaseClient'
 import styles from '../../styles/Dashboard.module.css'
+import type { SetGlobalPopup } from '../_app'
+
+type Props = {
+  setGlobalPopup?: SetGlobalPopup
+}
 
 type Family = {
   id: string
@@ -54,7 +59,7 @@ function statusBadgeStyle(status: PlaceSuggestion['status']) {
   return { background: '#fef2f2', color: '#b42318' }
 }
 
-export default function DashboardPlacesPage() {
+export default function DashboardPlacesPage({ setGlobalPopup }: Props) {
   const router = useRouter()
   const fromFindMatch = router.query.from === 'find-match'
 
@@ -63,7 +68,7 @@ export default function DashboardPlacesPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const [showCreateForm, setShowCreateForm] = useState(false)
 
   const [suggestedName, setSuggestedName] = useState('')
   const [suggestedKind, setSuggestedKind] = useState<'school' | 'activity' | 'other'>('school')
@@ -72,10 +77,20 @@ export default function DashboardPlacesPage() {
   const [suggestedPostalCode, setSuggestedPostalCode] = useState('')
   const [suggestedComment, setSuggestedComment] = useState('')
 
+  function showPopup(message: string, type: 'success' | 'error' = 'success') {
+    if (setGlobalPopup) {
+      setGlobalPopup({ message, type })
+      return
+    }
+
+    if (type === 'error') {
+      setError(message)
+    }
+  }
+
   useEffect(() => {
     async function loadPage() {
       setError('')
-      setSuccess('')
 
       const {
         data: { user },
@@ -142,10 +157,9 @@ export default function DashboardPlacesPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError('')
-    setSuccess('')
 
     if (!family) {
-      setError('Famille introuvable.')
+      showPopup('Famille introuvable.', 'error')
       return
     }
 
@@ -153,7 +167,7 @@ export default function DashboardPlacesPage() {
     const cityTrimmed = suggestedCity.trim()
 
     if (!nameTrimmed || !cityTrimmed) {
-      setError('Le nom du lieu et la ville sont obligatoires.')
+      showPopup('Le nom du lieu et la ville sont obligatoires.', 'error')
       return
     }
 
@@ -176,7 +190,7 @@ export default function DashboardPlacesPage() {
     setSaving(false)
 
     if (error) {
-      setError(error.message)
+      showPopup(error.message, 'error')
       return
     }
 
@@ -187,14 +201,12 @@ export default function DashboardPlacesPage() {
     setSuggestedExactAddress('')
     setSuggestedPostalCode('')
     setSuggestedComment('')
-    setSuccess(
-      'Lieu proposé. Il devra être validé par l’administrateur avant d’être pris en compte dans la recherche.'
-    )
-  }
+    setShowCreateForm(false)
 
-  async function handleLogout() {
-    await supabase.auth.signOut()
-    router.push('/login')
+    showPopup(
+      'Lieu proposé. Il devra être validé par l’administrateur avant d’être pris en compte dans la recherche.',
+      'success'
+    )
   }
 
   if (loading) {
@@ -221,14 +233,11 @@ export default function DashboardPlacesPage() {
             <div className={styles.topbar}>
               <div>
                 <h1 className={styles.pageTitle}>Lieux</h1>
-                <p className={styles.pageIntro}>
-                  Consultez vos suggestions de lieux et proposez-en un nouveau si nécessaire.
-                </p>
               </div>
 
               <div className={styles.topbarActions}>
                 <Link href="/dashboard" className={styles.secondaryButton}>
-                  Retour dashboard
+                  Retour Mon espace
                 </Link>
                 {fromFindMatch ? (
                   <Link href="/dashboard/find-match" className={styles.primaryButton}>
@@ -238,21 +247,7 @@ export default function DashboardPlacesPage() {
               </div>
             </div>
 
-            <div
-              style={{
-                marginBottom: 24,
-                padding: 14,
-                borderRadius: 14,
-                background: '#fffbeb',
-                color: '#92400e',
-                border: '1px solid #f3d38a',
-                lineHeight: 1.6,
-              }}
-            >
-              <strong>Important :</strong> privilégiez les lieux déjà disponibles lorsque c’est
-              possible. Un lieu proposé ici devra être validé par l’administrateur avant d’être pris
-              en compte dans la recherche.
-            </div>
+            {error ? <p className={styles.errorMessage}>{error}</p> : null}
 
             <div className={styles.grid3}>
               <div className={styles.summaryCard}>
@@ -272,102 +267,104 @@ export default function DashboardPlacesPage() {
             </div>
 
             <div className={styles.sectionCard}>
-              <div className={styles.sectionHeader}>
-                <div>
-                  <h2 className={styles.sectionTitle}>Proposer un nouveau lieu</h2>
-                  <p className={styles.sectionText}>
-                    Remplissez ce formulaire uniquement si le lieu n’existe pas déjà.
-                  </p>
-                </div>
+              <div className={styles.itemActions}>
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  onClick={() => setShowCreateForm((prev) => !prev)}
+                >
+                  {showCreateForm ? 'Fermer' : 'Proposer un nouveau lieu'}
+                </button>
               </div>
 
-              <form onSubmit={handleSubmit} className={styles.form}>
-                <div className={styles.field}>
-                  <label>Nom du lieu</label>
-                  <input
-                    className={styles.input}
-                    type="text"
-                    value={suggestedName}
-                    onChange={(e) => setSuggestedName(e.target.value)}
-                    required
-                  />
+              {showCreateForm ? (
+                <div style={{ marginTop: 18 }}>
+                  <form onSubmit={handleSubmit} className={styles.form}>
+                    <div className={styles.field}>
+                      <label>Nom du lieu</label>
+                      <input
+                        className={styles.input}
+                        type="text"
+                        value={suggestedName}
+                        onChange={(e) => setSuggestedName(e.target.value)}
+                        required
+                      />
+                    </div>
+
+                    <div className={styles.fieldRow}>
+                      <div className={styles.field}>
+                        <label>Type</label>
+                        <select
+                          className={styles.select}
+                          value={suggestedKind}
+                          onChange={(e) =>
+                            setSuggestedKind(e.target.value as 'school' | 'activity' | 'other')
+                          }
+                        >
+                          <option value="school">École</option>
+                          <option value="activity">Activité</option>
+                          <option value="other">Autre</option>
+                        </select>
+                      </div>
+
+                      <div className={styles.field}>
+                        <label>Ville</label>
+                        <input
+                          className={styles.input}
+                          type="text"
+                          value={suggestedCity}
+                          onChange={(e) => setSuggestedCity(e.target.value)}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className={styles.fieldRow}>
+                      <div className={styles.field}>
+                        <label>Adresse exacte</label>
+                        <input
+                          className={styles.input}
+                          type="text"
+                          value={suggestedExactAddress}
+                          onChange={(e) => setSuggestedExactAddress(e.target.value)}
+                        />
+                      </div>
+
+                      <div className={styles.field}>
+                        <label>Code postal</label>
+                        <input
+                          className={styles.input}
+                          type="text"
+                          value={suggestedPostalCode}
+                          onChange={(e) => setSuggestedPostalCode(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className={styles.field}>
+                      <label>Commentaire</label>
+                      <textarea
+                        className={styles.textarea}
+                        value={suggestedComment}
+                        onChange={(e) => setSuggestedComment(e.target.value)}
+                        rows={4}
+                      />
+                    </div>
+
+                    <div className={styles.itemActions}>
+                      <button type="submit" className={styles.primaryButton} disabled={saving}>
+                        {saving ? 'Envoi...' : 'Proposer ce lieu'}
+                      </button>
+                    </div>
+                  </form>
                 </div>
-
-                <div className={styles.fieldRow}>
-                  <div className={styles.field}>
-                    <label>Type</label>
-                    <select
-                      className={styles.select}
-                      value={suggestedKind}
-                      onChange={(e) =>
-                        setSuggestedKind(e.target.value as 'school' | 'activity' | 'other')
-                      }
-                    >
-                      <option value="school">École</option>
-                      <option value="activity">Activité</option>
-                      <option value="other">Autre</option>
-                    </select>
-                  </div>
-
-                  <div className={styles.field}>
-                    <label>Ville</label>
-                    <input
-                      className={styles.input}
-                      type="text"
-                      value={suggestedCity}
-                      onChange={(e) => setSuggestedCity(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className={styles.fieldRow}>
-                  <div className={styles.field}>
-                    <label>Adresse exacte</label>
-                    <input
-                      className={styles.input}
-                      type="text"
-                      value={suggestedExactAddress}
-                      onChange={(e) => setSuggestedExactAddress(e.target.value)}
-                    />
-                  </div>
-
-                  <div className={styles.field}>
-                    <label>Code postal</label>
-                    <input
-                      className={styles.input}
-                      type="text"
-                      value={suggestedPostalCode}
-                      onChange={(e) => setSuggestedPostalCode(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className={styles.field}>
-                  <label>Commentaire</label>
-                  <textarea
-                    className={styles.textarea}
-                    value={suggestedComment}
-                    onChange={(e) => setSuggestedComment(e.target.value)}
-                    rows={4}
-                  />
-                </div>
-
-                <div className={styles.itemActions}>
-                  <button type="submit" className={styles.primaryButton} disabled={saving}>
-                    {saving ? 'Envoi...' : 'Proposer ce lieu'}
-                  </button>
-                </div>
-              </form>
+              ) : null}
             </div>
 
             <div className={styles.sectionCard}>
               <div className={styles.sectionHeader}>
                 <div>
                   <h2 className={styles.sectionTitle}>Mes suggestions de lieux</h2>
-                  <p className={styles.sectionText}>
-                    Suivez ici l’état de validation de vos propositions.
-                  </p>
                 </div>
               </div>
 
@@ -375,52 +372,54 @@ export default function DashboardPlacesPage() {
                 <p className={styles.statusMessage}>Aucune suggestion envoyée.</p>
               ) : (
                 <div className={styles.itemList}>
-                  {suggestions.map((item) => {
-                    const badge = statusBadgeStyle(item.status)
-
-                    return (
-                      <div key={item.id} className={styles.itemCard}>
-                        <div className={styles.itemHeader}>
-                          <div>
-                            <h3 className={styles.itemTitle}>{item.suggested_name}</h3>
-                            <p className={styles.itemMeta}>
-                              {item.city}
-                              {item.postal_code ? ` · ${item.postal_code}` : ''}
-                            </p>
-                          </div>
-
-                          <span
-                            className={styles.badge}
-                            style={{ background: badge.background, color: badge.color }}
-                          >
-                            {formatSuggestionStatus(item.status)}
-                          </span>
+                  {suggestions.map((suggestion) => (
+                    <div key={suggestion.id} className={styles.itemCard}>
+                      <div className={styles.itemHeader}>
+                        <div>
+                          <h3 className={styles.itemTitle}>{suggestion.suggested_name}</h3>
+                          <p className={styles.itemMeta}>
+                            {formatKind(suggestion.kind)} · {suggestion.city}
+                          </p>
                         </div>
 
-                        <div className={styles.itemBody}>
-                          <p>Type : {formatKind(item.kind)}</p>
-                          <p>Adresse : {item.exact_address || '—'}</p>
-                          <p>Commentaire : {item.comment || '—'}</p>
-                          <p>Note admin : {item.review_note || '—'}</p>
-                        </div>
+                        <span
+                          className={styles.badge}
+                          style={statusBadgeStyle(suggestion.status)}
+                        >
+                          {formatSuggestionStatus(suggestion.status)}
+                        </span>
                       </div>
-                    )
-                  })}
+
+                      <div className={styles.itemBody}>
+                        {suggestion.exact_address ? (
+                          <p>
+                            <strong>Adresse :</strong> {suggestion.exact_address}
+                          </p>
+                        ) : null}
+
+                        {suggestion.postal_code ? (
+                          <p>
+                            <strong>Code postal :</strong> {suggestion.postal_code}
+                          </p>
+                        ) : null}
+
+                        {suggestion.comment ? (
+                          <p>
+                            <strong>Commentaire :</strong> {suggestion.comment}
+                          </p>
+                        ) : null}
+
+                        {suggestion.review_note ? (
+                          <p>
+                            <strong>Note admin :</strong> {suggestion.review_note}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
-
-            <div className={styles.itemActions}>
-              <Link href="/" className={styles.secondaryButton}>
-                Accueil
-              </Link>
-              <button onClick={handleLogout} className={styles.secondaryButton}>
-                Se déconnecter
-              </button>
-            </div>
-
-            {error ? <p className={styles.errorMessage}>{error}</p> : null}
-            {success ? <p className={styles.successMessage}>{success}</p> : null}
           </div>
         </section>
       </main>

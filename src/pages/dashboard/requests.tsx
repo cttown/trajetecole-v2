@@ -15,21 +15,33 @@ import {
   formatTripTimeRange,
   respondToContactRequest,
   cancelContactRequest,
-  closeContactRequest,
 } from '../../lib/dashboardShared'
-import { getPriorityDelayText } from '../../lib/contactRequestConfig'
+import type { SetGlobalPopup } from '../_app'
 
-export default function DashboardRequestsPage() {
+type Props = {
+  setGlobalPopup?: SetGlobalPopup
+}
+
+export default function DashboardRequestsPage({ setGlobalPopup }: Props) {
   const router = useRouter()
 
   const [sentRequests, setSentRequests] = useState<ContactRequestListItem[]>([])
   const [receivedRequests, setReceivedRequests] = useState<ContactRequestListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [respondingRequestId, setRespondingRequestId] = useState<string | null>(null)
-  const [closingRequestId, setClosingRequestId] = useState<string | null>(null)
   const [cancellingRequestId, setCancellingRequestId] = useState<string | null>(null)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+
+  function showPopup(message: string, type: 'success' | 'error' = 'success') {
+    if (setGlobalPopup) {
+      setGlobalPopup({ message, type })
+      return
+    }
+
+    if (type === 'error') {
+      setError(message)
+    }
+  }
 
   async function reload() {
     const data = await loadContactRequests()
@@ -55,15 +67,14 @@ export default function DashboardRequestsPage() {
 
   async function handleRespond(contactRequestId: string, action: 'accept' | 'decline') {
     setError('')
-    setSuccess('')
     setRespondingRequestId(contactRequestId)
 
     try {
       await respondToContactRequest(contactRequestId, action)
-      setSuccess(action === 'accept' ? 'Demande acceptée.' : 'Demande refusée.')
+      showPopup(action === 'accept' ? 'Demande acceptée.' : 'Demande refusée.', 'success')
       await reload()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur.')
+      showPopup(err instanceof Error ? err.message : 'Erreur.', 'error')
     } finally {
       setRespondingRequestId(null)
     }
@@ -73,48 +84,16 @@ export default function DashboardRequestsPage() {
     if (!window.confirm('Confirmer l’annulation de cette demande ?')) return
 
     setError('')
-    setSuccess('')
     setCancellingRequestId(contactRequestId)
 
     try {
       await cancelContactRequest(contactRequestId)
-      setSuccess('Demande annulée.')
+      showPopup('Demande annulée.', 'success')
       await reload()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur.')
+      showPopup(err instanceof Error ? err.message : 'Erreur.', 'error')
     } finally {
       setCancellingRequestId(null)
-    }
-  }
-
-  async function handleClose(
-    contactRequestId: string,
-    outcome: 'agreement_found' | 'no_agreement'
-  ) {
-    const confirmed = window.confirm(
-      outcome === 'agreement_found'
-        ? 'Confirmer que vous avez trouvé un accord avec cette famille ?'
-        : 'Confirmer que vous n’avez pas trouvé d’accord avec cette famille ?'
-    )
-
-    if (!confirmed) return
-
-    setError('')
-    setSuccess('')
-    setClosingRequestId(contactRequestId)
-
-    try {
-      await closeContactRequest(contactRequestId, outcome)
-      setSuccess(
-        outcome === 'agreement_found'
-          ? 'Demande clôturée avec accord.'
-          : 'Demande clôturée sans accord.'
-      )
-      await reload()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur.')
-    } finally {
-      setClosingRequestId(null)
     }
   }
 
@@ -131,8 +110,7 @@ export default function DashboardRequestsPage() {
           <div>
             <h3 className={styles.itemTitle}>{formatFullParentName(item)}</h3>
             <p className={styles.itemMeta}>
-              Créée le {formatDateTime(item.created_at)} · Délai de priorité jusqu’au{' '}
-              {formatDateTime(item.expires_at)}
+              Créée le {formatDateTime(item.created_at)} · Expire le {formatDateTime(item.expires_at)}
             </p>
           </div>
 
@@ -140,7 +118,7 @@ export default function DashboardRequestsPage() {
             className={
               item.status === 'pending'
                 ? styles.badgeYellow
-                : item.status === 'accepted' || item.status === 'closed_with_agreement'
+                : item.status === 'accepted'
                   ? styles.badgeGreen
                   : item.status === 'declined' || item.status === 'cancelled'
                     ? styles.badgeRed
@@ -152,6 +130,10 @@ export default function DashboardRequestsPage() {
         </div>
 
         <div className={styles.itemBody}>
+          <p>
+            <strong>Autre parent :</strong> {formatFullParentName(item)}
+          </p>
+
           {item.trip_links.map((link) => {
             const requesterTrip = link.requester_trip
             const targetTrip = link.target_trip
@@ -176,19 +158,16 @@ export default function DashboardRequestsPage() {
                   {formatTripPlaceLabel(requesterTrip?.to_place, requesterTrip?.to_suggestion)}
                 </p>
                 <p className={styles.smallMuted}>
-                  {mode === 'received'
-                    ? `Horaire de l’autre famille : ${formatTripTimeRange(targetTrip)}`
-                    : `Horaire de l’autre famille : ${formatTripTimeRange(targetTrip)}`}
+                  Horaire de l’autre famille : {formatTripTimeRange(targetTrip)}
                 </p>
               </div>
             )
           })}
         </div>
 
-        {(item.status === 'accepted' || item.status === 'closed_with_agreement') &&
-        item.other_family ? (
+        {item.status === 'accepted' && item.other_family ? (
           <p className={styles.successMessage}>
-            <strong>Coordonnée partagée :</strong> {item.other_family.email}
+            <strong>Email partagé :</strong> {item.other_family.email}
           </p>
         ) : null}
 
@@ -226,28 +205,6 @@ export default function DashboardRequestsPage() {
             </button>
           </div>
         ) : null}
-
-        {mode === 'sent' && item.status === 'accepted' ? (
-          <div className={styles.itemActions}>
-            <button
-              type="button"
-              className={styles.primaryButton}
-              onClick={() => handleClose(item.id, 'agreement_found')}
-              disabled={closingRequestId === item.id}
-            >
-              {closingRequestId === item.id ? 'Traitement...' : 'Accord trouvé'}
-            </button>
-
-            <button
-              type="button"
-              className={styles.secondaryButton}
-              onClick={() => handleClose(item.id, 'no_agreement')}
-              disabled={closingRequestId === item.id}
-            >
-              {closingRequestId === item.id ? 'Traitement...' : 'Pas d’accord trouvé'}
-            </button>
-          </div>
-        ) : null}
       </div>
     )
   }
@@ -276,9 +233,6 @@ export default function DashboardRequestsPage() {
             <div className={styles.topbar}>
               <div>
                 <h1 className={styles.pageTitle}>Mes demandes</h1>
-                <p className={styles.pageIntro}>
-                  Toutes les demandes reçues et envoyées restent consultables ici.
-                </p>
               </div>
               <div className={styles.topbarActions}>
                 <Link href="/dashboard" className={styles.secondaryButton}>
@@ -288,10 +242,6 @@ export default function DashboardRequestsPage() {
             </div>
 
             {error ? <p className={styles.errorMessage}>{error}</p> : null}
-            {success ? <p className={styles.successMessage}>{success}</p> : null}
-            <p className={styles.smallMuted} style={{ fontStyle: 'italic', marginTop: 8 }}>
-              Pendant le délai de priorité ({getPriorityDelayText()}), vous ne pouvez pas envoyer une nouvelle demande pour ce même trajet.
-            </p>
 
             <div className={styles.grid2}>
               <div className={styles.sectionCard}>

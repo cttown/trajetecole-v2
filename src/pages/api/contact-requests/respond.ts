@@ -11,14 +11,7 @@ type ContactRequestRow = {
   id: string
   requester_family_id: string
   target_family_id: string
-  status:
-    | 'pending'
-    | 'accepted'
-    | 'declined'
-    | 'expired'
-    | 'cancelled'
-    | 'closed_no_agreement'
-    | 'closed_with_agreement'
+  status: 'pending' | 'accepted' | 'declined' | 'expired' | 'cancelled'
   created_at: string
   expires_at: string
   accepted_at: string | null
@@ -176,19 +169,25 @@ export default async function handler(
                 title: 'Informations utiles',
                 lines: [
                   `Email partagé : ${ownFamily.email}`,
-                  `Date de réponse : ${new Date(nowIso).toLocaleString('fr-FR')}`,
+                  `Date de réponse : ${new Date(nowIso).toLocaleString('fr-FR', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}`,
                 ],
               },
             ],
             buttons: [
               {
-                label: 'Voir mon dashboard',
+                label: 'Voir mon espace',
                 url: `${appBaseUrl}/dashboard`,
                 kind: 'primary',
               },
             ],
             footerNote:
-              'Les coordonnées et le statut à jour sont visibles dans votre dashboard TrajetEcole.',
+              'Les coordonnées et le statut à jour sont visibles dans votre espace TrajetEcole.',
           }),
         })
       } else {
@@ -203,18 +202,26 @@ export default async function handler(
             sections: [
               {
                 title: 'Informations utiles',
-                lines: [`Date de réponse : ${new Date(nowIso).toLocaleString('fr-FR')}`],
+                lines: [
+                  `Date de réponse : ${new Date(nowIso).toLocaleString('fr-FR', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}`,
+                ],
               },
             ],
             buttons: [
               {
-                label: 'Voir mon dashboard',
+                label: 'Voir mon espace',
                 url: `${appBaseUrl}/dashboard`,
                 kind: 'primary',
               },
             ],
             footerNote:
-              'Les informations à jour sont visibles dans votre dashboard TrajetEcole.',
+              'Les informations à jour sont visibles dans votre espace TrajetEcole.',
           }),
         })
       }

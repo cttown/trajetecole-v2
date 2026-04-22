@@ -6,8 +6,9 @@ import {
   sendEmail,
 } from '../../../lib/email'
 import {
-  CONTACT_REQUEST_PRIORITY_MS,
-  getPriorityDelayText,
+  CONTACT_REQUEST_RESPONSE_WINDOW_MS,
+  CONTACT_REQUEST_RETRY_MS,
+  getContactRequestRetryMessage,
 } from '../../../lib/contactRequestConfig'
 
 type CreateContactRequestBody = {
@@ -27,8 +28,7 @@ type TripRow = {
   from_time: string
   to_time: string | null
   tolerance_min: number
-  status: 'searching' | 'resolved' | 'paused' | 'archived'
-  accepting_new_children: boolean
+  status: 'searching' | 'resolved_open' | 'resolved' | 'archived'
   revision: number
   created_at: string
   trip_group_id: string
@@ -38,14 +38,7 @@ type ContactRequestRow = {
   id: string
   requester_family_id: string
   target_family_id: string
-  status:
-    | 'pending'
-    | 'accepted'
-    | 'declined'
-    | 'expired'
-    | 'cancelled'
-    | 'closed_no_agreement'
-    | 'closed_with_agreement'
+  status: 'pending' | 'accepted' | 'declined' | 'expired' | 'cancelled'
   created_at: string
   expires_at: string
   accepted_at: string | null
@@ -86,9 +79,19 @@ function displayParentName(family: FamilyRow) {
   return full || family.email
 }
 
-function isTripEligible(trip: TripRow): boolean {
+function isTripEligibleForNeed(trip: TripRow): boolean {
   return (
     trip.status === 'searching' &&
+    !!trip.from_place_id &&
+    !!trip.to_place_id &&
+    !trip.from_place_suggestion_id &&
+    !trip.to_place_suggestion_id
+  )
+}
+
+function isTripEligibleAsOffer(trip: TripRow): boolean {
+  return (
+    (trip.status === 'searching' || trip.status === 'resolved_open') &&
     !!trip.from_place_id &&
     !!trip.to_place_id &&
     !trip.from_place_suggestion_id &&
@@ -99,11 +102,7 @@ function isTripEligible(trip: TripRow): boolean {
 function timeToMinutes(value: string | null): number | null {
   if (!value) return null
 
-  const parts = value.split(':')
-  if (parts.length < 2) return null
-
-  const hours = Number(parts[0])
-  const minutes = Number(parts[1])
+  const [hours, minutes] = value.split(':').map(Number)
 
   if (Number.isNaN(hours) || Number.isNaN(minutes)) return null
 
@@ -112,7 +111,7 @@ function timeToMinutes(value: string | null): number | null {
 
 function areTripsCompatible(requesterTrip: TripRow, targetTrip: TripRow): boolean {
   if (requesterTrip.family_id === targetTrip.family_id) return false
-  if (!isTripEligible(requesterTrip) || !isTripEligible(targetTrip)) return false
+  if (!isTripEligibleForNeed(requesterTrip) || !isTripEligibleAsOffer(targetTrip)) return false
 
   if (requesterTrip.day_of_week !== targetTrip.day_of_week) return false
   if (requesterTrip.from_place_id !== targetTrip.from_place_id) return false
@@ -146,13 +145,15 @@ function formatDay(dayOfWeek: number) {
   return labels[dayOfWeek] || `Jour ${dayOfWeek}`
 }
 
-function formatHour(value: string | null) {
+function formatTimeValue(value: string | null) {
   if (!value) return '—'
   return value.slice(0, 5)
 }
 
 function formatTripTimeRange(trip: TripRow) {
-  return trip.to_time ? `${formatHour(trip.from_time)} → ${formatHour(trip.to_time)}` : formatHour(trip.from_time)
+  return trip.to_time
+    ? `${formatTimeValue(trip.from_time)} → ${formatTimeValue(trip.to_time)}`
+    : formatTimeValue(trip.from_time)
 }
 
 function formatPlace(placeId: string | null, placeMap: Record<string, PlaceRow>) {
@@ -216,7 +217,9 @@ export default async function handler(
     }
 
     if (requesterFamily.id === targetFamilyId) {
-      return res.status(400).json({ error: 'Cannot contact your own family' })
+      return res.status(400).json({
+        error: 'Vous ne pouvez pas contacter votre propre famille.',
+      })
     }
 
     const { data: targetFamily, error: targetFamilyError } = await supabaseAdmin
@@ -227,67 +230,6 @@ export default async function handler(
 
     if (targetFamilyError || !targetFamily) {
       return res.status(404).json({ error: 'Target family not found' })
-    }
-
-    const nowIso = new Date().toISOString()
-
-    const { data: latestExistingRequest, error: latestExistingRequestError } = await supabaseAdmin
-      .from('contact_requests')
-      .select(`
-        id,
-        requester_family_id,
-        target_family_id,
-        status,
-        created_at,
-        expires_at,
-        accepted_at
-      `)
-      .or(
-        `and(requester_family_id.eq.${requesterFamily.id},target_family_id.eq.${targetFamilyId}),and(requester_family_id.eq.${targetFamilyId},target_family_id.eq.${requesterFamily.id})`
-      )
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (latestExistingRequestError) {
-      return res.status(500).json({ error: latestExistingRequestError.message })
-    }
-
-    if (latestExistingRequest) {
-      const request = latestExistingRequest as ContactRequestRow
-      const target = targetFamily as FamilyRow
-      const targetName = displayParentName(target)
-
-      const isStillExclusive =
-        request.status === 'pending' &&
-        new Date(request.expires_at).getTime() > Date.now()
-
-      if (isStillExclusive) {
-        return res.status(409).json({
-          error: `Vous avez déjà une demande en attente avec ${targetName}. Le délai de priorité court jusqu’au ${new Date(
-            request.expires_at
-          ).toLocaleString('fr-FR')}.`,
-          code: 'REQUEST_ALREADY_PENDING',
-          request_id: request.id,
-          status: request.status,
-          created_at: request.created_at,
-          expires_at: request.expires_at,
-        })
-      }
-
-      if (request.status === 'accepted' || request.status === 'closed_with_agreement') {
-        return res.status(409).json({
-          error: `Vous êtes déjà en contact avec ${targetName} depuis le ${new Date(
-            request.accepted_at ?? request.created_at
-          ).toLocaleString('fr-FR')}. Email : ${target.email}`,
-          code: 'REQUEST_ALREADY_ACCEPTED',
-          request_id: request.id,
-          status: request.status,
-          created_at: request.created_at,
-          accepted_at: request.accepted_at,
-          contact_email: target.email,
-        })
-      }
     }
 
     const { data: requesterTripsData, error: requesterTripsError } = await supabaseAdmin
@@ -305,7 +247,6 @@ export default async function handler(
         to_time,
         tolerance_min,
         status,
-        accepting_new_children,
         revision,
         created_at,
         trip_group_id
@@ -319,56 +260,51 @@ export default async function handler(
     const requesterTrips = (requesterTripsData ?? []) as TripRow[]
 
     if (requesterTrips.length !== requesterTripIds.length) {
-      return res.status(400).json({ error: 'Some requester trips were not found' })
+      return res.status(400).json({ error: 'Certains trajets n’ont pas été trouvés.' })
     }
 
     const invalidRequesterTrip = requesterTrips.find(
-      (trip) => trip.family_id !== requesterFamily.id || !isTripEligible(trip)
+      (trip) => trip.family_id !== requesterFamily.id || !isTripEligibleForNeed(trip)
     )
 
     if (invalidRequesterTrip) {
       return res.status(400).json({
-        error: 'Some requester trips are not eligible',
+        error: 'Certains trajets sélectionnés ne sont pas prêts pour la recherche.',
       })
     }
 
-    const { data: activeTripLinks, error: activeTripLinksError } = await supabaseAdmin
-      .from('contact_request_trips')
-      .select(`
-        requester_trip_id,
-        contact_requests!inner (
-          id,
-          status,
-          expires_at
-        )
-      `)
-      .in('requester_trip_id', requesterTripIds)
+    const retryCutoffIso = new Date(Date.now() - CONTACT_REQUEST_RETRY_MS).toISOString()
 
-    if (activeTripLinksError) {
-      return res.status(500).json({ error: activeTripLinksError.message })
+    const { data: recentRequests, error: recentRequestsError } = await supabaseAdmin
+      .from('contact_requests')
+      .select('id, created_at')
+      .eq('requester_family_id', requesterFamily.id)
+      .eq('target_family_id', targetFamilyId)
+      .gte('created_at', retryCutoffIso)
+
+    if (recentRequestsError) {
+      return res.status(500).json({ error: recentRequestsError.message })
     }
 
-    const hasBlockingLink = (activeTripLinks ?? []).some((link: any) => {
-      const request = Array.isArray(link.contact_requests)
-        ? link.contact_requests[0]
-        : link.contact_requests
+    const recentRequestIds = (recentRequests ?? []).map((item: any) => item.id)
 
-      if (!request) return false
-      if (request.status === 'accepted') return true
+    if (recentRequestIds.length > 0) {
+      const { data: recentTripLinks, error: recentTripLinksError } = await supabaseAdmin
+        .from('contact_request_trips')
+        .select('contact_request_id, requester_trip_id')
+        .in('contact_request_id', recentRequestIds)
+        .in('requester_trip_id', requesterTripIds)
 
-      if (request.status === 'pending') {
-        return new Date(request.expires_at).getTime() > Date.now()
+      if (recentTripLinksError) {
+        return res.status(500).json({ error: recentTripLinksError.message })
       }
 
-      return false
-    })
-
-    if (hasBlockingLink) {
-      return res.status(409).json({
-        error:
-          'Au moins un trajet sélectionné est déjà engagé dans une demande active ou encore pendant le délai de priorité.',
-        code: 'REQUESTER_TRIP_ALREADY_ENGAGED',
-      })
+      if ((recentTripLinks ?? []).length > 0) {
+        return res.status(409).json({
+          error: getContactRequestRetryMessage(),
+          code: 'REQUEST_RETRY_BLOCKED',
+        })
+      }
     }
 
     const { data: targetTripsData, error: targetTripsError } = await supabaseAdmin
@@ -386,19 +322,18 @@ export default async function handler(
         to_time,
         tolerance_min,
         status,
-        accepting_new_children,
         revision,
         created_at,
         trip_group_id
       `)
       .eq('family_id', targetFamilyId)
-      .eq('status', 'searching')
+      .in('status', ['searching', 'resolved_open'])
 
     if (targetTripsError) {
       return res.status(500).json({ error: targetTripsError.message })
     }
 
-    const targetTrips = ((targetTripsData ?? []) as TripRow[]).filter(isTripEligible)
+    const targetTrips = ((targetTripsData ?? []) as TripRow[]).filter(isTripEligibleAsOffer)
 
     const matchedPairs: { requester_trip_id: string; target_trip_id: string }[] = []
 
@@ -428,7 +363,9 @@ export default async function handler(
       })
     }
 
-    const expiresAt = new Date(Date.now() + CONTACT_REQUEST_PRIORITY_MS).toISOString()
+    const expiresAt = new Date(
+      Date.now() + CONTACT_REQUEST_RESPONSE_WINDOW_MS
+    ).toISOString()
 
     const { data: createdRequest, error: createRequestError } = await supabaseAdmin
       .from('contact_requests')
@@ -490,9 +427,12 @@ export default async function handler(
           : Promise.resolve({ data: [] as PlaceRow[] }),
       ])
 
-      const childMap = Object.fromEntries(((childRows ?? []) as ChildRow[]).map((child) => [child.id, child]))
-      const placeMap = Object.fromEntries(((placeRows ?? []) as PlaceRow[]).map((place) => [place.id, place]))
-
+      const childMap = Object.fromEntries(
+        ((childRows ?? []) as ChildRow[]).map((child) => [child.id, child])
+      )
+      const placeMap = Object.fromEntries(
+        ((placeRows ?? []) as PlaceRow[]).map((place) => [place.id, place])
+      )
       const targetTripMap = Object.fromEntries(targetTrips.map((trip) => [trip.id, trip]))
 
       const tripLines = matchedPairs.flatMap((pair, index) => {
@@ -539,8 +479,13 @@ export default async function handler(
               title: 'Informations générales',
               lines: [
                 `Nombre de trajets concernés : ${tripRows.length}`,
-                `Délai de priorité jusqu’au : ${new Date(createdRequest.expires_at).toLocaleString('fr-FR')}`,
-                `Pendant le délai de priorité (${getPriorityDelayText()}), une nouvelle demande ne peut pas être envoyée pour ce même trajet.`,
+                `Réponse attendue avant le : ${new Date(createdRequest.expires_at).toLocaleString('fr-FR', {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}`,
               ],
             },
             {

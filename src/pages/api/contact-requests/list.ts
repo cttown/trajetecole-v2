@@ -7,8 +7,6 @@ type ContactRequestStatus =
   | 'declined'
   | 'expired'
   | 'cancelled'
-  | 'closed_no_agreement'
-  | 'closed_with_agreement'
 
 type ContactRequestListItem = {
   id: string
@@ -28,65 +26,7 @@ type ContactRequestListItem = {
     parent_last_name: string | null
     email: string
   } | null
-  trip_links: {
-    id: string
-    contact_request_id: string
-    requester_trip_id: string
-    target_trip_id: string
-    created_at: string
-    requester_trip: {
-      id: string
-      day_of_week: number
-      from_time: string
-      to_time: string | null
-      trip_group_id: string
-      child: {
-        first_name: string
-      } | null
-      from_place: {
-        name: string
-        city: string
-      } | null
-      to_place: {
-        name: string
-        city: string
-      } | null
-      from_suggestion: {
-        suggested_name: string
-        city: string
-      } | null
-      to_suggestion: {
-        suggested_name: string
-        city: string
-      } | null
-    } | null
-    target_trip: {
-      id: string
-      day_of_week: number
-      from_time: string
-      to_time: string | null
-      trip_group_id: string
-      child: {
-        first_name: string
-      } | null
-      from_place: {
-        name: string
-        city: string
-      } | null
-      to_place: {
-        name: string
-        city: string
-      } | null
-      from_suggestion: {
-        suggested_name: string
-        city: string
-      } | null
-      to_suggestion: {
-        suggested_name: string
-        city: string
-      } | null
-    } | null
-  }[]
+  trip_links: any[]
 }
 
 function requireEnv(name: string): string {
@@ -136,84 +76,88 @@ export default async function handler(
       return res.status(404).json({ error: 'Family not found' })
     }
 
+    const commonSelect = `
+      id,
+      requester_family_id,
+      target_family_id,
+      status,
+      request_message,
+      created_at,
+      expires_at,
+      responded_at,
+      accepted_at,
+      closed_at,
+      close_reason,
+      trip_links:contact_request_trips (
+        id,
+        contact_request_id,
+        requester_trip_id,
+        target_trip_id,
+        created_at,
+        requester_trip:trips!contact_request_trips_requester_trip_id_fkey (
+          id,
+          day_of_week,
+          from_time,
+          to_time,
+          trip_group_id,
+          child:children (
+            first_name
+          ),
+          from_place:places!trips_from_place_id_fkey (
+            name,
+            city
+          ),
+          to_place:places!trips_to_place_id_fkey (
+            name,
+            city
+          ),
+          from_suggestion:place_suggestions!trips_from_place_suggestion_id_fkey (
+            suggested_name,
+            city
+          ),
+          to_suggestion:place_suggestions!trips_to_place_suggestion_id_fkey (
+            suggested_name,
+            city
+          )
+        ),
+        target_trip:trips!contact_request_trips_target_trip_id_fkey (
+          id,
+          day_of_week,
+          from_time,
+          to_time,
+          trip_group_id,
+          child:children (
+            first_name
+          ),
+          from_place:places!trips_from_place_id_fkey (
+            name,
+            city
+          ),
+          to_place:places!trips_to_place_id_fkey (
+            name,
+            city
+          ),
+          from_suggestion:place_suggestions!trips_from_place_suggestion_id_fkey (
+            suggested_name,
+            city
+          ),
+          to_suggestion:place_suggestions!trips_to_place_suggestion_id_fkey (
+            suggested_name,
+            city
+          )
+        )
+      )
+    `
+
     const { data: sentRows, error: sentError } = await supabaseAdmin
       .from('contact_requests')
       .select(`
-        id,
-        requester_family_id,
-        target_family_id,
-        status,
-        request_message,
-        created_at,
-        expires_at,
-        responded_at,
-        accepted_at,
-        closed_at,
-        close_reason,
+        ${commonSelect},
         target_family:families!contact_requests_target_family_id_fkey (
           id,
           parent_first_name,
           parent_last_name,
           email
-        ),
-        trip_links:contact_request_trips (
-          id,
-          contact_request_id,
-          requester_trip_id,
-          target_trip_id,
-          created_at,
-          requester_trip:trips!contact_request_trips_requester_trip_id_fkey (
-            id,
-            day_of_week,
-            from_time,
-            to_time,
-            trip_group_id,
-            child:children (
-              first_name
-            ),
-            from_place:places!trips_from_place_id_fkey (
-              name,
-              city
-            ),
-            to_place:places!trips_to_place_id_fkey (
-              name,
-              city
-            ),
-            from_suggestion:place_suggestions!trips_from_place_suggestion_id_fkey (
-              suggested_name,
-              city
-            ),
-            to_suggestion:place_suggestions!trips_to_place_suggestion_id_fkey (
-              suggested_name,
-              city
-            )
-          ),
-          target_trip:trips!contact_request_trips_target_trip_id_fkey (
-            id,
-            day_of_week,
-            from_time,
-            to_time,
-            trip_group_id,
-            child:children (
-              first_name
-            ),
-            from_place:places!trips_from_place_id_fkey (
-              name,
-              city
-            ),
-            to_place:places!trips_to_place_id_fkey (
-              name,
-              city
-            ),
-            from_suggestion:place_suggestions!trips_from_place_suggestion_id_fkey (
-              suggested_name,
-              city
-            ),
-            to_suggestion:place_suggestions!trips_to_place_suggestion_id_fkey (
-              suggested_name,
-              city
-            )
-          )
         )
       `)
       .eq('requester_family_id', ownFamily.id)
@@ -226,81 +170,12 @@ export default async function handler(
     const { data: receivedRows, error: receivedError } = await supabaseAdmin
       .from('contact_requests')
       .select(`
-        id,
-        requester_family_id,
-        target_family_id,
-        status,
-        request_message,
-        created_at,
-        expires_at,
-        responded_at,
-        accepted_at,
-        closed_at,
-        close_reason,
+        ${commonSelect},
         requester_family:families!contact_requests_requester_family_id_fkey (
           id,
           parent_first_name,
           parent_last_name,
           email
-        ),
-        trip_links:contact_request_trips (
-          id,
-          contact_request_id,
-          requester_trip_id,
-          target_trip_id,
-          created_at,
-          requester_trip:trips!contact_request_trips_requester_trip_id_fkey (
-            id,
-            day_of_week,
-            from_time,
-            to_time,
-            trip_group_id,
-            child:children (
-              first_name
-            ),
-            from_place:places!trips_from_place_id_fkey (
-              name,
-              city
-            ),
-            to_place:places!trips_to_place_id_fkey (
-              name,
-              city
-            ),
-            from_suggestion:place_suggestions!trips_from_place_suggestion_id_fkey (
-              suggested_name,
-              city
-            ),
-            to_suggestion:place_suggestions!trips_to_place_suggestion_id_fkey (
-              suggested_name,
-              city
-            )
-          ),
-          target_trip:trips!contact_request_trips_target_trip_id_fkey (
-            id,
-            day_of_week,
-            from_time,
-            to_time,
-            trip_group_id,
-            child:children (
-              first_name
-            ),
-            from_place:places!trips_from_place_id_fkey (
-              name,
-              city
-            ),
-            to_place:places!trips_to_place_id_fkey (
-              name,
-              city
-            ),
-            from_suggestion:place_suggestions!trips_from_place_suggestion_id_fkey (
-              suggested_name,
-              city
-            ),
-            to_suggestion:place_suggestions!trips_to_place_suggestion_id_fkey (
-              suggested_name,
-              city
-            )
-          )
         )
       `)
       .eq('target_family_id', ownFamily.id)

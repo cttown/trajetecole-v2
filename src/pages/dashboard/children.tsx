@@ -5,8 +5,13 @@ import { useRouter } from 'next/router'
 import styles from '../../styles/Dashboard.module.css'
 import { Child, requireFamily, loadChildren } from '../../lib/dashboardShared'
 import { supabase } from '../../lib/supabaseClient'
+import type { SetGlobalPopup } from '../_app'
 
-export default function DashboardChildrenPage() {
+type Props = {
+  setGlobalPopup?: SetGlobalPopup
+}
+
+export default function DashboardChildrenPage({ setGlobalPopup }: Props) {
   const router = useRouter()
 
   const [familyId, setFamilyId] = useState('')
@@ -17,7 +22,17 @@ export default function DashboardChildrenPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+
+  function showPopup(message: string, type: 'success' | 'error' = 'success') {
+    if (setGlobalPopup) {
+      setGlobalPopup({ message, type })
+      return
+    }
+
+    if (type === 'error') {
+      setError(message)
+    }
+  }
 
   useEffect(() => {
     async function loadPage() {
@@ -40,11 +55,10 @@ export default function DashboardChildrenPage() {
   async function handleAddChild(e: FormEvent) {
     e.preventDefault()
     setError('')
-    setSuccess('')
 
     if (!familyId) return
     if (!childFirstName.trim()) {
-      setError('Le prénom de l’enfant est obligatoire.')
+      showPopup('Le prénom de l’enfant est obligatoire.', 'error')
       return
     }
 
@@ -63,19 +77,18 @@ export default function DashboardChildrenPage() {
     setSaving(false)
 
     if (error) {
-      setError(error.message)
+      showPopup(error.message, 'error')
       return
     }
 
     setChildren((prev) => [...prev, data])
     setChildFirstName('')
     setChildLevel('')
-    setSuccess('Enfant ajouté.')
+    showPopup('Enfant ajouté.', 'success')
   }
 
   async function handleDeleteChild(childId: string) {
     setError('')
-    setSuccess('')
     setDeletingId(childId)
 
     const { error } = await supabase.from('children').delete().eq('id', childId)
@@ -83,12 +96,12 @@ export default function DashboardChildrenPage() {
     setDeletingId(null)
 
     if (error) {
-      setError(error.message)
+      showPopup(error.message, 'error')
       return
     }
 
     setChildren((prev) => prev.filter((child) => child.id !== childId))
-    setSuccess('Enfant supprimé.')
+    showPopup('Enfant supprimé.', 'success')
   }
 
   if (loading) {
@@ -106,7 +119,7 @@ export default function DashboardChildrenPage() {
   return (
     <>
       <Head>
-        <title>Mes enfants - TrajetEcole</title>
+        <title>Enfants - TrajetEcole</title>
       </Head>
 
       <main className={styles.page}>
@@ -114,15 +127,16 @@ export default function DashboardChildrenPage() {
           <div className={styles.container}>
             <div className={styles.topbar}>
               <div>
-                <h1 className={styles.pageTitle}>Mes enfants</h1>
-                <p className={styles.pageIntro}>Ajoutez ou supprimez les enfants liés à vos trajets.</p>
+                <h1 className={styles.pageTitle}>Enfants</h1>
               </div>
               <div className={styles.topbarActions}>
                 <Link href="/dashboard" className={styles.secondaryButton}>
-                  Retour dashboard
+                  Retour Mon espace
                 </Link>
               </div>
             </div>
+
+            {error ? <p className={styles.errorMessage}>{error}</p> : null}
 
             <div className={styles.sectionCard}>
               <div className={styles.sectionHeader}>
@@ -160,9 +174,6 @@ export default function DashboardChildrenPage() {
                   </button>
                 </div>
               </form>
-
-              {error ? <p className={styles.errorMessage}>{error}</p> : null}
-              {success ? <p className={styles.successMessage}>{success}</p> : null}
             </div>
 
             <div className={styles.sectionCard}>

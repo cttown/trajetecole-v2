@@ -9,14 +9,7 @@ type ContactRequestRow = {
   id: string
   requester_family_id: string
   target_family_id: string
-  status:
-    | 'pending'
-    | 'accepted'
-    | 'declined'
-    | 'expired'
-    | 'cancelled'
-    | 'closed_no_agreement'
-    | 'closed_with_agreement'
+  status: 'pending' | 'accepted' | 'declined' | 'expired' | 'cancelled'
 }
 
 function requireEnv(name: string): string {

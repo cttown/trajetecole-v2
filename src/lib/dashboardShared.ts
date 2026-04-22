@@ -46,6 +46,12 @@ export type PlaceSuggestion = {
   reviewed_at: string | null
 }
 
+export type TripStatus =
+  | 'searching'
+  | 'resolved_open'
+  | 'resolved'
+  | 'archived'
+
 export type Trip = {
   id: string
   family_id: string
@@ -58,8 +64,7 @@ export type Trip = {
   from_time: string
   to_time: string | null
   tolerance_min: number
-  status: 'searching' | 'resolved' | 'paused' | 'archived'
-  accepting_new_children: boolean
+  status: TripStatus
   revision: number
   created_at: string
   trip_group_id: string
@@ -102,18 +107,18 @@ export type ContactRequestTripLink = {
   target_trip: TripSummary | null
 }
 
+export type ContactRequestStatus =
+  | 'pending'
+  | 'accepted'
+  | 'declined'
+  | 'expired'
+  | 'cancelled'
+
 export type ContactRequestListItem = {
   id: string
   requester_family_id: string
   target_family_id: string
-  status:
-    | 'pending'
-    | 'accepted'
-    | 'declined'
-    | 'expired'
-    | 'cancelled'
-    | 'closed_no_agreement'
-    | 'closed_with_agreement'
+  status: ContactRequestStatus
   request_message: string | null
   created_at: string
   expires_at: string
@@ -146,7 +151,6 @@ export type FamilyTripMatch = {
   time_diff_min: number
   allowed_diff_min: number
   time_fit_score: number
-  target_accepting_new_children: boolean
 }
 
 export type FamilyMatch = {
@@ -157,20 +161,15 @@ export type FamilyMatch = {
   compatibility_score: number
   trip_compatibility_score: number
   history_score_normalized: number
-  availability_score: number
   coverage_ratio: number
   average_time_fit_score: number
-  accepting_ratio: number
   history_status:
     | 'none_yet'
     | 'pending'
     | 'accepted'
     | 'declined_before'
     | 'expired_before'
-    | 'closed_before'
     | 'cancelled_before'
-    | 'closed_with_agreement'
-    | 'closed_no_agreement'
   history_label: string
   history_request_id: string | null
   history_created_at: string | null
@@ -204,10 +203,21 @@ export function formatDayValues(dayValues: number[]) {
     .join(', ')
 }
 
+export function formatTimeValue(value: string | null) {
+  if (!value) return '—'
+  return value.slice(0, 5)
+}
+
 export function formatDateTime(value: string | null) {
   if (!value) return '—'
   const date = new Date(value)
-  return date.toLocaleString('fr-FR')
+  return date.toLocaleString('fr-FR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 export function formatRequestStatus(status: ContactRequestListItem['status']) {
@@ -215,10 +225,7 @@ export function formatRequestStatus(status: ContactRequestListItem['status']) {
   if (status === 'accepted') return 'Acceptée'
   if (status === 'declined') return 'Refusée'
   if (status === 'expired') return 'Expirée'
-  if (status === 'cancelled') return 'Annulée'
-  if (status === 'closed_with_agreement') return 'Accord trouvé'
-  if (status === 'closed_no_agreement') return 'Pas d’accord trouvé'
-  return 'Clôturée'
+  return 'Annulée'
 }
 
 export function formatSuggestionStatus(status: PlaceSuggestion['status']) {
@@ -235,9 +242,13 @@ export function formatKind(kind: Place['kind'] | PlaceSuggestion['kind']) {
 }
 
 export function formatTripStatus(status: Trip['status']) {
-  if (status === 'searching') return 'Recherche'
-  if (status === 'resolved') return 'Résolu'
-  if (status === 'paused') return 'En pause'
+  if (status === 'searching') return 'Recherche de solution en cours'
+  if (status === 'resolved_open') {
+    return 'Solution trouvée, d’autres familles peuvent me joindre'
+  }
+  if (status === 'resolved') {
+    return 'Solution trouvée, d’autres familles ne peuvent plus me joindre'
+  }
   return 'Archivé'
 }
 
@@ -253,9 +264,15 @@ export function isTripReadyForMatching(trip: Trip): boolean {
 
 export function getTripBlockingReason(trip: Trip): string | null {
   if (trip.status !== 'searching') {
-    if (trip.status === 'resolved') return 'Trajet déjà résolu.'
-    if (trip.status === 'paused') return 'Trajet en pause.'
-    if (trip.status === 'archived') return 'Trajet archivé.'
+    if (trip.status === 'resolved_open') {
+      return 'Une solution a déjà été trouvée pour ce trajet. Il reste visible pour d’autres familles.'
+    }
+    if (trip.status === 'resolved') {
+      return 'Une solution a déjà été trouvée pour ce trajet.'
+    }
+    if (trip.status === 'archived') {
+      return 'Trajet archivé.'
+    }
   }
 
   const fromPending = !!trip.from_place_suggestion_id
@@ -300,7 +317,9 @@ export function formatTripPlaceLabel(
 
 export function formatTripTimeRange(trip: TripSummary | null) {
   if (!trip) return '—'
-  return trip.to_time ? `${trip.from_time} → ${trip.to_time}` : trip.from_time
+  return trip.to_time
+    ? `${formatTimeValue(trip.from_time)} → ${formatTimeValue(trip.to_time)}`
+    : formatTimeValue(trip.from_time)
 }
 
 export async function requireFamily(router?: NextRouter) {
@@ -353,7 +372,6 @@ export async function loadTrips(familyId: string) {
       to_time,
       tolerance_min,
       status,
-      accepting_new_children,
       revision,
       created_at,
       trip_group_id
@@ -540,41 +558,6 @@ export async function cancelContactRequest(contactRequestId: string) {
 
   if (!response.ok) {
     throw new Error(payload?.error || 'Erreur lors de l’annulation de la demande.')
-  }
-
-  return payload
-}
-
-export async function closeContactRequest(
-  contactRequestId: string,
-  outcome: 'agreement_found' | 'no_agreement'
-) {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  const accessToken = session?.access_token
-
-  if (!accessToken) {
-    throw new Error('Session introuvable.')
-  }
-
-  const response = await fetch('/api/contact-requests/close', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify({
-      contact_request_id: contactRequestId,
-      outcome,
-    }),
-  })
-
-  const payload = await response.json().catch(() => null)
-
-  if (!response.ok) {
-    throw new Error(payload?.error || 'Erreur lors de la clôture de la demande.')
   }
 
   return payload
