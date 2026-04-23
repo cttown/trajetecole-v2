@@ -628,7 +628,7 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
                         <input
                           id="fromTime"
                           type="time"
-                          className={`${styles.input} ${styles.timeInput}`}
+                          className={styles.timeInput}
                           value={fromTime}
                           onChange={(e) => setFromTime(e.target.value)}
                           required
