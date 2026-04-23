@@ -25,6 +25,8 @@ type SearchPlaceResult = {
   id: string
   name: string
   city: string
+  source: 'place' | 'suggestion'
+  provisional?: boolean
 }
 
 const STATUS_OPTIONS: { value: TripStatus; label: string }[] = [
@@ -85,12 +87,15 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
   const [deletingTripGroupId, setDeletingTripGroupId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
+  const [showNewPlaceConfirm, setShowNewPlaceConfirm] = useState(false)
 
   const [childId, setChildId] = useState('')
   const [fromPlaceQuery, setFromPlaceQuery] = useState('')
   const [toPlaceQuery, setToPlaceQuery] = useState('')
   const [fromPlaceId, setFromPlaceId] = useState('')
   const [toPlaceId, setToPlaceId] = useState('')
+  const [fromPlaceSource, setFromPlaceSource] = useState<'place' | 'suggestion' | ''>('')
+  const [toPlaceSource, setToPlaceSource] = useState<'place' | 'suggestion' | ''>('')
   const [fromResults, setFromResults] = useState<SearchPlaceResult[]>([])
   const [toResults, setToResults] = useState<SearchPlaceResult[]>([])
   const [selectedDays, setSelectedDays] = useState<number[]>([])
@@ -163,9 +168,7 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
     const response = await fetch(`/api/places/search?q=${encodeURIComponent(query.trim())}`)
     const payload = await response.json().catch(() => null)
 
-    if (!response.ok) {
-      return
-    }
+    if (!response.ok) return
 
     const results = payload?.results ?? []
 
@@ -187,6 +190,8 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
     setToPlaceQuery('')
     setFromPlaceId('')
     setToPlaceId('')
+    setFromPlaceSource('')
+    setToPlaceSource('')
     setFromResults([])
     setToResults([])
     setSelectedDays([])
@@ -209,12 +214,12 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
     }
 
     if (!fromPlaceId || !toPlaceId) {
-      showPopup('Veuillez sélectionner un départ et une destination dans la liste proposée.', 'error')
+      showPopup('Veuillez sélectionner un départ et une arrivée dans la liste proposée.', 'error')
       return
     }
 
-    if (fromPlaceId === toPlaceId) {
-      showPopup('Le départ et la destination doivent être différents.', 'error')
+    if (fromPlaceId === toPlaceId && fromPlaceSource === 'place' && toPlaceSource === 'place') {
+      showPopup('Le départ et l’arrivée doivent être différents.', 'error')
       return
     }
 
@@ -235,10 +240,10 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
     const rows = selectedDays.map((day) => ({
       family_id: familyId,
       child_id: childId,
-      from_place_id: fromPlaceId,
-      to_place_id: toPlaceId,
-      from_place_suggestion_id: null,
-      to_place_suggestion_id: null,
+      from_place_id: fromPlaceSource === 'place' ? fromPlaceId : null,
+      to_place_id: toPlaceSource === 'place' ? toPlaceId : null,
+      from_place_suggestion_id: fromPlaceSource === 'suggestion' ? fromPlaceId : null,
+      to_place_suggestion_id: toPlaceSource === 'suggestion' ? toPlaceId : null,
       day_of_week: day,
       from_time: fromTime,
       to_time: null,
@@ -307,6 +312,11 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
     setEditingStatus(group.items[0]?.status || 'searching')
   }
 
+  function goToPlacesPage() {
+    setShowNewPlaceConfirm(false)
+    router.push('/dashboard/places')
+  }
+
   function TripGroupList({
     title,
     groups,
@@ -336,7 +346,7 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
                     <div>
                       <h3 className={styles.itemTitle}>{child?.first_name || 'Enfant'}</h3>
                       <p className={styles.itemMeta}>
-                        Jours : {group.items.map((trip) => formatSingleDay(trip.day_of_week)).join(', ')}
+                        <strong>Départ</strong> et <strong>Arrivée</strong> définis pour ce trajet
                       </p>
                     </div>
 
@@ -345,12 +355,13 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
                     </span>
                   </div>
 
-                  <div className={styles.itemBody}>
+                  <div className={styles.itemBodyCompact}>
                     <p>
-                      <strong>Horaire :</strong> {formatTimeValue(firstTrip?.from_time ?? null)}
+                      <strong>Jours</strong> :{' '}
+                      {group.items.map((trip) => formatSingleDay(trip.day_of_week)).join(', ')}
                     </p>
                     <p>
-                      <strong>Tolérance :</strong> {firstTrip?.tolerance_min ?? '—'} min
+                      <strong>Horaire</strong> : {formatTimeValue(firstTrip?.from_time ?? null)}
                     </p>
                   </div>
 
@@ -360,7 +371,7 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
                       className={styles.secondaryButton}
                       onClick={() => openEdit(group)}
                     >
-                      Modifier
+                      Mettre à jour le statut
                     </button>
 
                     <button
@@ -522,37 +533,48 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
                         onChange={(e) => {
                           setFromPlaceQuery(e.target.value)
                           setFromPlaceId('')
+                          setFromPlaceSource('')
                           void searchPlaces(e.target.value, 'from')
                         }}
                         placeholder="Commencez à saisir un lieu"
                       />
                       {fromResults.length > 0 ? (
-                        <div className={styles.itemList} style={{ marginTop: 8 }}>
+                        <div className={styles.searchResultsList}>
                           {fromResults.map((item) => (
                             <button
                               key={item.id}
                               type="button"
-                              className={styles.secondaryButton}
+                              className={styles.searchResultButton}
                               onClick={() => {
                                 setFromPlaceId(item.id)
-                                setFromPlaceQuery(`${item.name} (${item.city})`)
+                                setFromPlaceSource(item.source)
+                                setFromPlaceQuery(
+                                  `${item.name} (${item.city})${
+                                    item.provisional ? ' — provisoire' : ''
+                                  }`
+                                )
                                 setFromResults([])
                               }}
                             >
-                              {item.name} ({item.city})
+                              <span>
+                                {item.name} ({item.city})
+                                {item.provisional ? ' — provisoire' : ''}
+                              </span>
                             </button>
                           ))}
+                          <button
+                            type="button"
+                            className={styles.searchResultButtonAlt}
+                            onClick={() => setShowNewPlaceConfirm(true)}
+                          >
+                            Ajouter un nouveau lieu
+                          </button>
                         </div>
                       ) : null}
-                      <div className={styles.itemActions} style={{ marginTop: 8 }}>
-                        <Link href="/dashboard/places" className={styles.secondaryButton}>
-                          Proposer un nouveau lieu
-                        </Link>
-                      </div>
                     </div>
 
                     <div className={styles.field}>
-                      <label htmlFor="toPlaceQuery">Destination</label>
+                      <label htmlFor="toPlaceQuery">Arrivée</label>
                       <input
                         id="toPlaceQuery"
                         className={styles.input}
@@ -560,33 +582,44 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
                         onChange={(e) => {
                           setToPlaceQuery(e.target.value)
                           setToPlaceId('')
+                          setToPlaceSource('')
                           void searchPlaces(e.target.value, 'to')
                         }}
                         placeholder="Commencez à saisir un lieu"
                       />
                       {toResults.length > 0 ? (
-                        <div className={styles.itemList} style={{ marginTop: 8 }}>
+                        <div className={styles.searchResultsList}>
                           {toResults.map((item) => (
                             <button
                               key={item.id}
                               type="button"
-                              className={styles.secondaryButton}
+                              className={styles.searchResultButton}
                               onClick={() => {
                                 setToPlaceId(item.id)
-                                setToPlaceQuery(`${item.name} (${item.city})`)
+                                setToPlaceSource(item.source)
+                                setToPlaceQuery(
+                                  `${item.name} (${item.city})${
+                                    item.provisional ? ' — provisoire' : ''
+                                  }`
+                                )
                                 setToResults([])
                               }}
                             >
-                              {item.name} ({item.city})
+                              <span>
+                                {item.name} ({item.city})
+                                {item.provisional ? ' — provisoire' : ''}
+                              </span>
                             </button>
                           ))}
+                          <button
+                            type="button"
+                            className={styles.searchResultButtonAlt}
+                            onClick={() => setShowNewPlaceConfirm(true)}
+                          >
+                            Ajouter un nouveau lieu
+                          </button>
                         </div>
                       ) : null}
-                      <div className={styles.itemActions} style={{ marginTop: 8 }}>
-                        <Link href="/dashboard/places" className={styles.secondaryButton}>
-                          Proposer un nouveau lieu
-                        </Link>
-                      </div>
                     </div>
 
                     <div className={styles.fieldRow}>
@@ -595,7 +628,7 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
                         <input
                           id="fromTime"
                           type="time"
-                          className={styles.input}
+                          className={`${styles.input} ${styles.timeInput}`}
                           value={fromTime}
                           onChange={(e) => setFromTime(e.target.value)}
                           required
@@ -652,6 +685,41 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
             </div>
           </div>
         </section>
+
+        {showNewPlaceConfirm ? (
+          <div className={styles.modalOverlay}>
+            <div className={styles.modalSmallCard}>
+              <p className={styles.modalText}>
+                Il est préférable de sélectionner un lieu préenregistré.
+                <br />
+                <br />
+                Vous pouvez demander l’ajout d’un nouveau lieu, mais il devra être validé par
+                l’administrateur avant toute recherche de trajet compatible.
+                <br />
+                <br />
+                Vous voulez quand-même en ajouter un ? Si oui, faites-le, puis revenez ici pour
+                compléter vos trajets.
+              </p>
+
+              <div className={styles.itemActions}>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={() => setShowNewPlaceConfirm(false)}
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  onClick={goToPlacesPage}
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </main>
     </>
   )

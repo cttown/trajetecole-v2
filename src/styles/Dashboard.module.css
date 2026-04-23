@@ -222,6 +222,16 @@
   line-height: 1.7;
 }
 
+.sectionCompactNote {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f8fbff;
+  border: 1px solid #dbe8f5;
+  color: #3a5b83;
+  line-height: 1.6;
+}
+
 .form {
   display: grid;
   gap: 16px;
@@ -273,6 +283,11 @@
   box-shadow: 0 0 0 4px rgba(33, 145, 255, 0.12);
 }
 
+.timeInput {
+  min-height: 56px;
+  padding-right: 10px;
+}
+
 .textarea {
   resize: vertical;
   min-height: 110px;
@@ -322,6 +337,14 @@
   padding: 18px;
 }
 
+.itemCardCompact {
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid #dbe8f5;
+  border-radius: 16px;
+  box-shadow: 0 10px 24px rgba(24, 61, 109, 0.06);
+}
+
 .itemHeader {
   display: flex;
   justify-content: space-between;
@@ -348,6 +371,14 @@
   gap: 6px;
   color: #3a5b83;
   line-height: 1.65;
+}
+
+.itemBodyCompact {
+  display: grid;
+  gap: 4px;
+  color: #3a5b83;
+  line-height: 1.45;
+  font-size: 15px;
 }
 
 .itemActions {
@@ -488,6 +519,35 @@
   font-size: 14px;
 }
 
+.searchResultsList {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.searchResultButton,
+.searchResultButtonAlt {
+  width: 100%;
+  text-align: left;
+  border-radius: 12px;
+  padding: 12px 14px;
+  border: 1px solid #dbe8f5;
+  background: #fff;
+  color: #17396a;
+  cursor: pointer;
+  font-size: 15px;
+}
+
+.searchResultButton:hover,
+.searchResultButtonAlt:hover {
+  background: #f8fbff;
+}
+
+.searchResultButtonAlt {
+  font-weight: 700;
+  color: #1b5fae;
+}
+
 .modalOverlay {
   position: fixed;
   inset: 0;
@@ -505,6 +565,23 @@
   max-height: 85vh;
   overflow-y: auto;
   padding: 20px;
+}
+
+.modalSmallCard {
+  max-width: 520px;
+  width: 100%;
+  background: #fff;
+  border: 1px solid #dbe8f5;
+  border-radius: 20px;
+  box-shadow: 0 18px 42px rgba(24, 61, 109, 0.16);
+  padding: 22px;
+}
+
+.modalText {
+  margin: 0;
+  color: #17396a;
+  line-height: 1.7;
+  font-size: 15px;
 }
 
 @media (max-width: 1080px) {
@@ -539,7 +616,8 @@
   .sectionCard,
   .summaryCard,
   .itemCard,
-  .modalCard {
+  .modalCard,
+  .modalSmallCard {
     border-radius: 18px;
   }
 
@@ -554,5 +632,19 @@
   .heroActions,
   .itemActions {
     width: 100%;
+  }
+
+  .timeInput {
+    min-height: 60px;
+    font-size: 18px;
+  }
+
+  .itemCardCompact {
+    padding: 10px 12px;
+  }
+
+  .itemBodyCompact {
+    font-size: 14px;
+    line-height: 1.4;
   }
 }

@@ -23,10 +23,14 @@ type Props = {
   setGlobalPopup?: SetGlobalPopup
 }
 
+type PlaceSource = '' | 'place' | 'suggestion'
+
 type SearchPlaceResult = {
   id: string
   name: string
   city: string
+  source: Exclude<PlaceSource, ''>
+  provisional?: boolean
 }
 
 const DAY_OPTIONS = [
@@ -60,11 +64,8 @@ function recalculateFilteredMatch(match: FamilyMatch): FamilyMatch {
         )
       : 0
 
-  const coverageRatio =
-    match.trip_matches.length > 0 ? 1 : 0
-
-  const tripCompatibilityScore =
-    uniqueRequesterTripIds.length > 0 ? 100 : 0
+  const coverageRatio = uniqueRequesterTripIds.length > 0 ? 1 : 0
+  const tripCompatibilityScore = uniqueRequesterTripIds.length > 0 ? 100 : 0
 
   const compatibilityScore = Math.round(
     tripCompatibilityScore * 0.55 +
@@ -121,6 +122,8 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
     match: null,
   })
 
+  const [showNewPlaceConfirm, setShowNewPlaceConfirm] = useState(false)
+
   const [childFirstName, setChildFirstName] = useState('')
   const [childLevel, setChildLevel] = useState('')
   const [savingChild, setSavingChild] = useState(false)
@@ -129,6 +132,10 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
   const [toPlaceQuery, setToPlaceQuery] = useState('')
   const [fromPlaceId, setFromPlaceId] = useState('')
   const [toPlaceId, setToPlaceId] = useState('')
+
+const [fromPlaceSource, setFromPlaceSource] = useState<PlaceSource>('')
+const [toPlaceSource, setToPlaceSource] = useState<PlaceSource>('')
+
   const [fromResults, setFromResults] = useState<SearchPlaceResult[]>([])
   const [toResults, setToResults] = useState<SearchPlaceResult[]>([])
   const [selectedDays, setSelectedDays] = useState<number[]>([])
@@ -141,7 +148,6 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
       setGlobalPopup({ message, type })
       return
     }
-
     if (type === 'error') {
       setError(message)
     }
@@ -185,6 +191,11 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
     return trips.filter((trip) => trip.child_id === selectedChildId && trip.status === 'searching')
   }, [selectedChildId, trips])
 
+  const groupedDeparture = useMemo(() => {
+    const labels = selectedChildTrips.map((trip) => trip.from_place_id).filter(Boolean)
+    return labels.length > 0 ? 'Départ et arrivée identiques pour tous les trajets sélectionnables sur cette étape.' : ''
+  }, [selectedChildTrips])
+
   async function reloadChildren() {
     if (!familyId) return
     setChildren(await loadChildren(familyId))
@@ -219,9 +230,7 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
     const response = await fetch(`/api/places/search?q=${encodeURIComponent(query.trim())}`)
     const payload = await response.json().catch(() => null)
 
-    if (!response.ok) {
-      return
-    }
+    if (!response.ok) return
 
     const searchResults = payload?.results ?? []
 
@@ -285,7 +294,7 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
       return
     }
 
-    if (fromPlaceId === toPlaceId) {
+    if (fromPlaceId === toPlaceId && fromPlaceSource === 'place' && toPlaceSource === 'place') {
       showPopup('Le départ et la destination doivent être différents.', 'error')
       return
     }
@@ -300,6 +309,14 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
       return
     }
 
+    if (fromPlaceSource === 'suggestion' || toPlaceSource === 'suggestion') {
+      showPopup(
+        "L’administrateur du site doit valider le lieu provisoire avant toute recherche de trajet. Nous vous tiendrons au courant par email dans un délai de 3 jours maximum.",
+        'error'
+      )
+      return
+    }
+
     setSavingTrip(true)
 
     const tripGroupId = crypto.randomUUID()
@@ -307,10 +324,10 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
     const rows = selectedDays.map((day) => ({
       family_id: familyId,
       child_id: selectedChildId,
-      from_place_id: fromPlaceId,
-      to_place_id: toPlaceId,
-      from_place_suggestion_id: null,
-      to_place_suggestion_id: null,
+      from_place_id: fromPlaceSource === 'place' ? fromPlaceId : null,
+      to_place_id: toPlaceSource === 'place' ? toPlaceId : null,
+      from_place_suggestion_id: fromPlaceSource === 'suggestion' ? fromPlaceId : null,
+      to_place_suggestion_id: toPlaceSource === 'suggestion' ? toPlaceId : null,
       day_of_week: day,
       from_time: fromTime,
       to_time: null,
@@ -318,6 +335,7 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
       status: 'searching',
       trip_group_id: tripGroupId,
     }))
+
 
     const { error } = await supabase.from('trips').insert(rows)
 
@@ -333,6 +351,8 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
     setToPlaceQuery('')
     setFromPlaceId('')
     setToPlaceId('')
+    setFromPlaceSource('')
+    setToPlaceSource('')
     setFromResults([])
     setToResults([])
     setSelectedDays([])
@@ -347,6 +367,19 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
     setLoadingMatching(true)
 
     try {
+      const provisionalSelected = selectedChildTrips
+        .filter((trip) => selectedTripIds.includes(trip.id))
+        .some((trip) => trip.from_place_suggestion_id || trip.to_place_suggestion_id)
+
+      if (provisionalSelected) {
+        showPopup(
+          "L’administrateur du site doit valider le lieu provisoire avant toute recherche de trajet. Nous vous tiendrons au courant par email dans un délai de 3 jours maximum.",
+          'error'
+        )
+        setLoadingMatching(false)
+        return
+      }
+
       const allResults = await runFamilyMatchingRequest()
 
       const filteredResults =
@@ -429,6 +462,11 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
 
   function scoreExplanation() {
     return 'Score estimé à partir de la proximité des lieux, des horaires et de l’historique des échanges entre familles.'
+  }
+
+  function goToPlacesPage() {
+    setShowNewPlaceConfirm(false)
+    router.push('/dashboard/places')
   }
 
   if (loading) {
@@ -575,24 +613,39 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
                     Aucun trajet en recherche pour cet enfant.
                   </p>
                 ) : (
-                  <div className={styles.itemList}>
-                    {selectedChildTrips.map((trip) => (
-                      <label key={trip.id} className={styles.itemCard} style={{ cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={selectedTripIds.includes(trip.id)}
-                          onChange={() => toggleTripSelection(trip.id)}
-                          style={{ marginRight: 10 }}
-                        />
-                        <strong>{formatSingleDay(trip.day_of_week)}</strong>
-                        <div className={styles.itemBody} style={{ marginTop: 8 }}>
+                  <>
+                    <div className={styles.sectionCompactNote}>
+                      {selectedChildTrips[0]?.from_place_id || selectedChildTrips[0]?.from_place_suggestion_id ? (
+                        <>
                           <p>
-                            <strong>Horaire :</strong> {formatTimeValue(trip.from_time)}
+                            <strong>Départ</strong> : commun aux trajets affichés
                           </p>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
+                          <p>
+                            <strong>Arrivée</strong> : commune aux trajets affichés
+                          </p>
+                        </>
+                      ) : null}
+                    </div>
+
+                    <div className={styles.itemList}>
+                      {selectedChildTrips.map((trip) => (
+                        <label key={trip.id} className={styles.itemCard} style={{ cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={selectedTripIds.includes(trip.id)}
+                            onChange={() => toggleTripSelection(trip.id)}
+                            style={{ marginRight: 10 }}
+                          />
+                          <strong>{formatSingleDay(trip.day_of_week)}</strong>
+                          <div className={styles.itemBodyCompact} style={{ marginTop: 8 }}>
+                            <p>
+                              <strong>Horaire</strong> : {formatTimeValue(trip.from_time)}
+                            </p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </>
                 )}
 
                 {!showAddTrip ? (
@@ -614,7 +667,7 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
                     </button>
 
                     <Link href="/dashboard/trips" className={styles.secondaryButton}>
-                      Modifier un trajet
+                      Mettre à jour les trajets
                     </Link>
 
                     <button
@@ -680,37 +733,48 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
                           onChange={(e) => {
                             setFromPlaceQuery(e.target.value)
                             setFromPlaceId('')
+                            setFromPlaceSource('')
                             void searchPlaces(e.target.value, 'from')
                           }}
                           placeholder="Commencez à saisir un lieu"
                         />
                         {fromResults.length > 0 ? (
-                          <div className={styles.itemList} style={{ marginTop: 8 }}>
+                          <div className={styles.searchResultsList}>
                             {fromResults.map((item) => (
                               <button
                                 key={item.id}
                                 type="button"
-                                className={styles.secondaryButton}
+                                className={styles.searchResultButton}
                                 onClick={() => {
                                   setFromPlaceId(item.id)
-                                  setFromPlaceQuery(`${item.name} (${item.city})`)
+                                  setFromPlaceSource(item.source)
+                                  setFromPlaceQuery(
+                                    `${item.name} (${item.city})${
+                                      item.provisional ? ' — provisoire' : ''
+                                    }`
+                                  )
                                   setFromResults([])
                                 }}
                               >
-                                {item.name} ({item.city})
+                                <span>
+                                  {item.name} ({item.city})
+                                  {item.provisional ? ' — provisoire' : ''}
+                                </span>
                               </button>
                             ))}
+                            <button
+                              type="button"
+                              className={styles.searchResultButtonAlt}
+                              onClick={() => setShowNewPlaceConfirm(true)}
+                            >
+                              Ajouter un nouveau lieu
+                            </button>
                           </div>
                         ) : null}
-                        <div className={styles.itemActions} style={{ marginTop: 8 }}>
-                          <Link href="/dashboard/places" className={styles.secondaryButton}>
-                            Proposer un nouveau lieu
-                          </Link>
-                        </div>
                       </div>
 
                       <div className={styles.field}>
-                        <label htmlFor="toPlaceQuery">Destination</label>
+                        <label htmlFor="toPlaceQuery">Arrivée</label>
                         <input
                           id="toPlaceQuery"
                           className={styles.input}
@@ -718,33 +782,44 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
                           onChange={(e) => {
                             setToPlaceQuery(e.target.value)
                             setToPlaceId('')
+                            setToPlaceSource('')
                             void searchPlaces(e.target.value, 'to')
                           }}
                           placeholder="Commencez à saisir un lieu"
                         />
                         {toResults.length > 0 ? (
-                          <div className={styles.itemList} style={{ marginTop: 8 }}>
+                          <div className={styles.searchResultsList}>
                             {toResults.map((item) => (
                               <button
                                 key={item.id}
                                 type="button"
-                                className={styles.secondaryButton}
+                                className={styles.searchResultButton}
                                 onClick={() => {
                                   setToPlaceId(item.id)
-                                  setToPlaceQuery(`${item.name} (${item.city})`)
+                                  setToPlaceSource(item.source)
+                                  setToPlaceQuery(
+                                    `${item.name} (${item.city})${
+                                      item.provisional ? ' — provisoire' : ''
+                                    }`
+                                  )
                                   setToResults([])
                                 }}
                               >
-                                {item.name} ({item.city})
+                                <span>
+                                  {item.name} ({item.city})
+                                  {item.provisional ? ' — provisoire' : ''}
+                                </span>
                               </button>
                             ))}
+                            <button
+                              type="button"
+                              className={styles.searchResultButtonAlt}
+                              onClick={() => setShowNewPlaceConfirm(true)}
+                            >
+                              Ajouter un nouveau lieu
+                            </button>
                           </div>
                         ) : null}
-                        <div className={styles.itemActions} style={{ marginTop: 8 }}>
-                          <Link href="/dashboard/places" className={styles.secondaryButton}>
-                            Proposer un nouveau lieu
-                          </Link>
-                        </div>
                       </div>
 
                       <div className={styles.fieldRow}>
@@ -753,8 +828,7 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
                           <input
                             id="fromTime"
                             type="time"
-                            className={styles.input}
-                            style={{ width: '100%', minHeight: 48 }}
+                            className={`${styles.input} ${styles.timeInput}`}
                             value={fromTime}
                             onChange={(e) => setFromTime(e.target.value)}
                             required
@@ -822,10 +896,7 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
                                     prev === match.target_family_id ? null : match.target_family_id
                                   )
                                 }
-                                style={{
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                }}
+                                style={{ border: 'none', cursor: 'pointer' }}
                               >
                                 {match.compatibility_score}% ⓘ
                               </button>
@@ -846,8 +917,7 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
                             {match.trip_matches.map((tripMatch) => (
                               <div
                                 key={`${tripMatch.requester_trip_id}-${tripMatch.target_trip_id}`}
-                                className={styles.itemCard}
-                                style={{ padding: 14 }}
+                                className={styles.itemCardCompact}
                               >
                                 <p>
                                   <strong>{formatSingleDay(tripMatch.day_of_week)}</strong>
@@ -928,49 +998,13 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
         </section>
 
         {confirmState.open ? (
-          <div
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(15, 23, 42, 0.38)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 20,
-              zIndex: 9999,
-            }}
-          >
-            <div
-              style={{
-                width: '100%',
-                maxWidth: 440,
-                background: '#ffffff',
-                borderRadius: 18,
-                padding: '24px 22px',
-                boxShadow: '0 24px 60px rgba(15, 23, 42, 0.24)',
-                border: '1px solid #dbe8f5',
-              }}
-            >
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 16,
-                  lineHeight: 1.7,
-                  color: '#17396a',
-                }}
-              >
+          <div className={styles.modalOverlay}>
+            <div className={styles.modalSmallCard}>
+              <p className={styles.modalText}>
                 Envoyer une demande de mise en relation à <strong>{confirmParentName}</strong> ?
               </p>
 
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  gap: 10,
-                  marginTop: 20,
-                  flexWrap: 'wrap',
-                }}
-              >
+              <div className={styles.itemActions}>
                 <button
                   type="button"
                   className={styles.secondaryButton}
@@ -984,6 +1018,41 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
                   onClick={confirmRequestContact}
                 >
                   Envoyer
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {showNewPlaceConfirm ? (
+          <div className={styles.modalOverlay}>
+            <div className={styles.modalSmallCard}>
+              <p className={styles.modalText}>
+                Il est préférable de sélectionner un lieu préenregistré.
+                <br />
+                <br />
+                Vous pouvez demander l’ajout d’un nouveau lieu, mais il devra être validé par
+                l’administrateur avant toute recherche de trajet compatible.
+                <br />
+                <br />
+                Vous voulez quand-même en ajouter un ? Si oui, faites-le, puis revenez ici pour
+                compléter vos trajets.
+              </p>
+
+              <div className={styles.itemActions}>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={() => setShowNewPlaceConfirm(false)}
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  onClick={goToPlacesPage}
+                >
+                  OK
                 </button>
               </div>
             </div>

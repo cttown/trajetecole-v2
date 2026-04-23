@@ -3,28 +3,13 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import styles from '../../styles/Dashboard.module.css'
-import {
-  Child,
-  ContactRequestListItem,
-  PlaceSuggestion,
-  Trip,
-  loadChildren,
-  loadTrips,
-  loadPlaceSuggestions,
-  loadContactRequests,
-  requireFamily,
-} from '../../lib/dashboardShared'
+import { requireFamily } from '../../lib/dashboardShared'
 import { trackEvent } from '../../lib/trackEvent'
 
 export default function DashboardHomePage() {
   const router = useRouter()
 
   const [email, setEmail] = useState('')
-  const [children, setChildren] = useState<Child[]>([])
-  const [trips, setTrips] = useState<Trip[]>([])
-  const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([])
-  const [sentRequests, setSentRequests] = useState<ContactRequestListItem[]>([])
-  const [receivedRequests, setReceivedRequests] = useState<ContactRequestListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -43,21 +28,7 @@ export default function DashboardHomePage() {
       try {
         const { family } = await requireFamily(router)
         if (!family) return
-
         setEmail(family.email)
-
-        const [childrenData, tripsData, suggestionsData, requestsData] = await Promise.all([
-          loadChildren(family.id),
-          loadTrips(family.id),
-          loadPlaceSuggestions(family.id),
-          loadContactRequests(),
-        ])
-
-        setChildren(childrenData)
-        setTrips(tripsData)
-        setSuggestions(suggestionsData)
-        setSentRequests(requestsData.sent)
-        setReceivedRequests(requestsData.received)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erreur de chargement.')
       } finally {
@@ -113,10 +84,6 @@ export default function DashboardHomePage() {
                 </div>
               </div>
 
-              <div className={styles.itemBody}>
-                <p>Choisissez un enfant, sélectionnez les trajets à rechercher, puis lancez la recherche.</p>
-              </div>
-
               <div className={styles.itemActions}>
                 <Link href="/dashboard/find-match" className={styles.primaryButton}>
                   Commencer
@@ -151,16 +118,6 @@ export default function DashboardHomePage() {
                 <Link href="/dashboard/places" className={styles.quickLinkCard}>
                   <h3 className={styles.quickLinkTitle}>Lieux</h3>
                 </Link>
-              </div>
-            </div>
-
-            <div className={styles.sectionCard}>
-              <div className={styles.itemBody}>
-                <p>
-                  Enfants : <strong>{children.length}</strong> · Trajets : <strong>{trips.length}</strong> ·
-                  Demandes reçues : <strong>{receivedRequests.length}</strong> · Suggestions de lieux :{' '}
-                  <strong>{suggestions.length}</strong> · Demandes envoyées : <strong>{sentRequests.length}</strong>
-                </p>
               </div>
             </div>
           </div>
