@@ -283,10 +283,15 @@
   box-shadow: 0 0 0 4px rgba(33, 145, 255, 0.12);
 }
 
+
 .timeInput {
   min-height: 56px;
-  padding-right: 10px;
+  width: 100%;
+  max-width: 100%;
+  padding: 10px 12px;
+  box-sizing: border-box;
 }
+
 
 .textarea {
   resize: vertical;
