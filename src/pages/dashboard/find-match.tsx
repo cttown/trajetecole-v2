@@ -326,8 +326,12 @@ const [toPlaceSource, setToPlaceSource] = useState<PlaceSource>('')
       child_id: selectedChildId,
       from_place_id: fromPlaceSource === 'place' ? fromPlaceId : null,
       to_place_id: toPlaceSource === 'place' ? toPlaceId : null,
-      from_place_suggestion_id: fromPlaceSource === 'suggestion' ? fromPlaceId : null,
-      to_place_suggestion_id: toPlaceSource === 'suggestion' ? toPlaceId : null,
+      
+      from_place_suggestion_id:
+        String(fromPlaceSource) === 'suggestion' ? fromPlaceId : null,
+      to_place_suggestion_id:
+        String(toPlaceSource) === 'suggestion' ? toPlaceId : null,
+
       day_of_week: day,
       from_time: fromTime,
       to_time: null,
