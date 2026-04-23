@@ -7,10 +7,14 @@ import {
   Child,
   FamilyMatch,
   Trip,
+  Place,
+  PlaceSuggestion,
   createContactRequest,
   formatSingleDay,
   formatTimeValue,
   loadChildren,
+  loadPlaces,
+  loadPlaceSuggestions,
   loadTrips,
   requireFamily,
   runFamilyMatchingRequest,
@@ -23,13 +27,11 @@ type Props = {
   setGlobalPopup?: SetGlobalPopup
 }
 
-type PlaceSource = '' | 'place' | 'suggestion'
-
 type SearchPlaceResult = {
   id: string
   name: string
   city: string
-  source: Exclude<PlaceSource, ''>
+  source: 'place' | 'suggestion'
   provisional?: boolean
 }
 
@@ -104,6 +106,8 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
   const [familyId, setFamilyId] = useState('')
   const [children, setChildren] = useState<Child[]>([])
   const [trips, setTrips] = useState<Trip[]>([])
+  const [places, setPlaces] = useState<Place[]>([])
+  const [placeSuggestions, setPlaceSuggestions] = useState<PlaceSuggestion[]>([])
 
   const [step, setStep] = useState(1)
   const [results, setResults] = useState<FamilyMatch[]>([])
@@ -132,10 +136,8 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
   const [toPlaceQuery, setToPlaceQuery] = useState('')
   const [fromPlaceId, setFromPlaceId] = useState('')
   const [toPlaceId, setToPlaceId] = useState('')
-
-const [fromPlaceSource, setFromPlaceSource] = useState<PlaceSource>('')
-const [toPlaceSource, setToPlaceSource] = useState<PlaceSource>('')
-
+  const [fromPlaceSource, setFromPlaceSource] = useState<'' | 'place' | 'suggestion'>('')
+  const [toPlaceSource, setToPlaceSource] = useState<'' | 'place' | 'suggestion'>('')
   const [fromResults, setFromResults] = useState<SearchPlaceResult[]>([])
   const [toResults, setToResults] = useState<SearchPlaceResult[]>([])
   const [selectedDays, setSelectedDays] = useState<number[]>([])
@@ -169,13 +171,17 @@ const [toPlaceSource, setToPlaceSource] = useState<PlaceSource>('')
 
         setFamilyId(family.id)
 
-        const [childrenData, tripsData] = await Promise.all([
+        const [childrenData, tripsData, placesData, suggestionsData] = await Promise.all([
           loadChildren(family.id),
           loadTrips(family.id),
+          loadPlaces(),
+          loadPlaceSuggestions(),
         ])
 
         setChildren(childrenData)
         setTrips(tripsData)
+        setPlaces(placesData)
+        setPlaceSuggestions(suggestionsData)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erreur de chargement.')
       } finally {
@@ -186,15 +192,72 @@ const [toPlaceSource, setToPlaceSource] = useState<PlaceSource>('')
     loadPage()
   }, [router])
 
+  const placeMap = useMemo(
+    () => Object.fromEntries(places.map((place) => [place.id, place])),
+    [places]
+  )
+
+  const suggestionMap = useMemo(
+    () => Object.fromEntries(placeSuggestions.map((item) => [item.id, item])),
+    [placeSuggestions]
+  )
+
+  function getPlaceLabel(placeId: string | null, suggestionId?: string | null) {
+    if (placeId) {
+      const place = placeMap[placeId]
+      if (!place) return 'Lieu inconnu'
+      return `${place.name} (${place.city})`
+    }
+
+    if (suggestionId) {
+      const suggestion = suggestionMap[suggestionId]
+      if (!suggestion) return 'Lieu provisoire'
+      return `${suggestion.suggested_name} (${suggestion.city}) — provisoire`
+    }
+
+    return 'Lieu non renseigné'
+  }
+
   const selectedChildTrips = useMemo(() => {
     if (!selectedChildId) return []
     return trips.filter((trip) => trip.child_id === selectedChildId && trip.status === 'searching')
   }, [selectedChildId, trips])
 
-  const groupedDeparture = useMemo(() => {
-    const labels = selectedChildTrips.map((trip) => trip.from_place_id).filter(Boolean)
-    return labels.length > 0 ? 'Départ et arrivée identiques pour tous les trajets sélectionnables sur cette étape.' : ''
-  }, [selectedChildTrips])
+  const groupedSelectedChildTrips = useMemo(() => {
+    const groups = new Map<
+      string,
+      {
+        departureLabel: string
+        destinationLabel: string
+        trips: Trip[]
+      }
+    >()
+
+    for (const trip of selectedChildTrips) {
+      const departureLabel = getPlaceLabel(trip.from_place_id, trip.from_place_suggestion_id)
+      const destinationLabel = getPlaceLabel(trip.to_place_id, trip.to_place_suggestion_id)
+      const key = `${departureLabel}__${destinationLabel}`
+
+      const current = groups.get(key)
+      if (current) {
+        current.trips.push(trip)
+      } else {
+        groups.set(key, {
+          departureLabel,
+          destinationLabel,
+          trips: [trip],
+        })
+      }
+    }
+
+    return Array.from(groups.values()).map((group) => ({
+      ...group,
+      trips: [...group.trips].sort((a, b) => {
+        if (a.day_of_week !== b.day_of_week) return a.day_of_week - b.day_of_week
+        return a.from_time.localeCompare(b.from_time)
+      }),
+    }))
+  }, [selectedChildTrips, placeMap, suggestionMap])
 
   async function reloadChildren() {
     if (!familyId) return
@@ -326,12 +389,10 @@ const [toPlaceSource, setToPlaceSource] = useState<PlaceSource>('')
       child_id: selectedChildId,
       from_place_id: fromPlaceSource === 'place' ? fromPlaceId : null,
       to_place_id: toPlaceSource === 'place' ? toPlaceId : null,
-      
       from_place_suggestion_id:
         String(fromPlaceSource) === 'suggestion' ? fromPlaceId : null,
       to_place_suggestion_id:
         String(toPlaceSource) === 'suggestion' ? toPlaceId : null,
-
       day_of_week: day,
       from_time: fromTime,
       to_time: null,
@@ -339,7 +400,6 @@ const [toPlaceSource, setToPlaceSource] = useState<PlaceSource>('')
       status: 'searching',
       trip_group_id: tripGroupId,
     }))
-
 
     const { error } = await supabase.from('trips').insert(rows)
 
@@ -617,39 +677,35 @@ const [toPlaceSource, setToPlaceSource] = useState<PlaceSource>('')
                     Aucun trajet en recherche pour cet enfant.
                   </p>
                 ) : (
-                  <>
-                    <div className={styles.sectionCompactNote}>
-                      {selectedChildTrips[0]?.from_place_id || selectedChildTrips[0]?.from_place_suggestion_id ? (
-                        <>
+                  <div className={styles.itemList}>
+                    {groupedSelectedChildTrips.map((group, index) => (
+                      <div key={`${group.departureLabel}-${group.destinationLabel}-${index}`} className={styles.itemCard}>
+                        <div className={styles.itemBodyCompact}>
                           <p>
-                            <strong>Départ</strong> : commun aux trajets affichés
+                            <strong>Départ</strong> : {group.departureLabel}
                           </p>
                           <p>
-                            <strong>Arrivée</strong> : commune aux trajets affichés
+                            <strong>Destination</strong> : {group.destinationLabel}
                           </p>
-                        </>
-                      ) : null}
-                    </div>
+                        </div>
 
-                    <div className={styles.itemList}>
-                      {selectedChildTrips.map((trip) => (
-                        <label key={trip.id} className={styles.itemCard} style={{ cursor: 'pointer' }}>
-                          <input
-                            type="checkbox"
-                            checked={selectedTripIds.includes(trip.id)}
-                            onChange={() => toggleTripSelection(trip.id)}
-                            style={{ marginRight: 10 }}
-                          />
-                          <strong>{formatSingleDay(trip.day_of_week)}</strong>
-                          <div className={styles.itemBodyCompact} style={{ marginTop: 8 }}>
-                            <p>
-                              <strong>Horaire</strong> : {formatTimeValue(trip.from_time)}
-                            </p>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </>
+                        <div className={styles.itemList} style={{ marginTop: 10 }}>
+                          {group.trips.map((trip) => (
+                            <label key={trip.id} className={styles.itemCardCompact} style={{ cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={selectedTripIds.includes(trip.id)}
+                                onChange={() => toggleTripSelection(trip.id)}
+                                style={{ marginRight: 10 }}
+                              />
+                              <strong>{formatSingleDay(trip.day_of_week)}</strong>{' '}
+                              {formatTimeValue(trip.from_time)}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
 
                 {!showAddTrip ? (
@@ -778,7 +834,7 @@ const [toPlaceSource, setToPlaceSource] = useState<PlaceSource>('')
                       </div>
 
                       <div className={styles.field}>
-                        <label htmlFor="toPlaceQuery">Arrivée</label>
+                        <label htmlFor="toPlaceQuery">Destination</label>
                         <input
                           id="toPlaceQuery"
                           className={styles.input}
@@ -832,7 +888,7 @@ const [toPlaceSource, setToPlaceSource] = useState<PlaceSource>('')
                           <input
                             id="fromTime"
                             type="time"
-                            className={styles.timeInput}
+                            className={`${styles.input} ${styles.timeInput}`}
                             value={fromTime}
                             onChange={(e) => setFromTime(e.target.value)}
                             required
@@ -933,7 +989,7 @@ const [toPlaceSource, setToPlaceSource] = useState<PlaceSource>('')
                                   <strong>Départ</strong> : {tripMatch.requester_from_label}
                                 </p>
                                 <p>
-                                  <strong>Arrivée</strong> : {tripMatch.requester_to_label}
+                                  <strong>Destination</strong> : {tripMatch.requester_to_label}
                                 </p>
                                 <p>
                                   <strong>Vous</strong> : {formatTimeValue(tripMatch.requester_from_time)}
