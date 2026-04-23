@@ -926,8 +926,7 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
 
                 {results.length === 0 ? (
                   <p className={styles.statusMessage}>
-                    Aucun parent compatible trouvé pour le moment. On vous tiendra au courant dès
-                    qu’un trajet compatible sera disponible.
+                    Aucun parent compatible trouvé pour le moment. N’hésitez pas à revenir plus tard ou à élargir vos critères de recherche en ajoutant d’autres trajets.
                   </p>
                 ) : (
                   <div className={styles.itemList}>
