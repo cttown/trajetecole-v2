@@ -6,10 +6,10 @@ export default function ConfidentialitePage() {
   return (
     <>
       <Head>
-        <title>Politique de confidentialité - TrajetEcole</title>
+        <title>Confidentialité - TrajetEcole</title>
         <meta
           name="description"
-          content="Politique de confidentialité de TrajetEcole."
+          content="Comment TrajetEcole utilise et protège vos données."
         />
       </Head>
 
@@ -18,67 +18,69 @@ export default function ConfidentialitePage() {
           <div className={styles.container}>
             <div className={styles.legalHeader}>
               <div className={styles.badge}>TrajetEcole</div>
-              <h1 className={styles.legalTitle}>Politique de confidentialité</h1>
+              <h1 className={styles.legalTitle}>Confidentialité</h1>
               <p className={styles.legalIntro}>
-                Cette page explique simplement quelles données sont utilisées,
-                dans quel but, et comment demander leur suppression.
+                Vos données servent uniquement à faire fonctionner le service
+                et à faciliter la mise en relation entre familles.
               </p>
             </div>
 
             <div className={styles.legalCard}>
-              <h2>1. Finalité du service</h2>
-              <p>
-                TrajetEcole permet à des parents de se mettre en relation
-                pour organiser des trajets liés à l’école ou aux activités.
-              </p>
-            </div>
-
-            <div className={styles.legalCard}>
-              <h2>2. Données utilisées</h2>
+              <h2>En bref</h2>
               <ul className={styles.legalList}>
-                <li>données de compte nécessaires à la connexion ;</li>
-                <li>trajets saisis par l’utilisateur ;</li>
-                <li>jours, horaires et lieux liés aux trajets ;</li>
-                <li>demandes de mise en relation et leur statut ;</li>
-                <li>messages envoyés à l’administrateur ;</li>
-                <li>données techniques nécessaires au bon fonctionnement du service.</li>
+                <li>vous gardez la main sur vos informations ;</li>
+                <li>la mise en relation ne se fait jamais automatiquement ;</li>
+                <li>vous pouvez demander la suppression de vos données.</li>
               </ul>
             </div>
 
             <div className={styles.legalCard}>
-              <h2>3. Pourquoi ces données sont utilisées</h2>
+              <h2>Données utilisées</h2>
               <ul className={styles.legalList}>
-                <li>permettre l’authentification ;</li>
-                <li>enregistrer et afficher les trajets ;</li>
-                <li>détecter les correspondances compatibles ;</li>
+                <li>vos informations de compte ;</li>
+                <li>les enfants et trajets que vous enregistrez ;</li>
+                <li>les jours, horaires et lieux associés ;</li>
+                <li>les demandes de mise en relation ;</li>
+                <li>les messages envoyés à l’administrateur ;</li>
+                <li>les données techniques utiles au bon fonctionnement du site.</li>
+              </ul>
+            </div>
+
+            <div className={styles.legalCard}>
+              <h2>Pourquoi ces données ?</h2>
+              <ul className={styles.legalList}>
+                <li>vous permettre de vous connecter ;</li>
+                <li>enregistrer et afficher vos trajets ;</li>
+                <li>rechercher des familles compatibles ;</li>
                 <li>gérer les demandes entre parents ;</li>
-                <li>envoyer les notifications utiles au service ;</li>
-                <li>répondre aux demandes adressées à l’administrateur.</li>
+                <li>envoyer les emails utiles au service ;</li>
+                <li>répondre à vos questions.</li>
               </ul>
             </div>
 
             <div className={styles.legalCard}>
-              <h2>4. Mise en relation</h2>
+              <h2>Mise en relation</h2>
               <p>
-                La mise en relation n’est pas libre ni automatique.
-                Elle passe par une demande explicite, visible et suivie dans le dashboard.
+                Les coordonnées ne sont pas partagées librement.
+                Une famille doit d’abord envoyer une demande, puis l’autre famille
+                doit l’accepter.
               </p>
             </div>
 
             <div className={styles.legalCard}>
-              <h2>5. Suppression des données</h2>
+              <h2>Suppression des données</h2>
               <p>
-                Une procédure de suppression des données est disponible sur la plateforme.
-                Les données actives peuvent être supprimées selon le fonctionnement prévu par le service.
-                Certaines informations d’historique peuvent être conservées séparément si nécessaire.
+                Vous pouvez demander la suppression de vos données depuis la plateforme.
+                Certaines informations techniques ou d’historique peuvent être conservées
+                si cela est nécessaire au bon fonctionnement du service ou au suivi des échanges.
               </p>
             </div>
 
             <div className={styles.legalCard}>
-              <h2>6. Contact</h2>
+              <h2>Une question ?</h2>
               <p>
-                Pour toute question sur vos données ou sur le service,
-                vous pouvez utiliser la page de contact administrateur.
+                Si vous avez une question sur vos données ou sur le fonctionnement du site,
+                vous pouvez contacter l’administrateur.
               </p>
             </div>
 

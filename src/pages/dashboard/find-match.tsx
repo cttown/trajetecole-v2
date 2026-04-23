@@ -126,6 +126,8 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
     match: null,
   })
 
+  const [isSendingRequest, setIsSendingRequest] = useState(false)
+
   const [showNewPlaceConfirm, setShowNewPlaceConfirm] = useState(false)
 
   const [childFirstName, setChildFirstName] = useState('')
@@ -480,11 +482,17 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
       open: false,
       match: null,
     })
+    setIsSendingRequest(false)
   }
 
   async function confirmRequestContact() {
+    if (isSendingRequest) return
+
     const match = confirmState.match
     if (!match) return
+
+    setIsSendingRequest(true)
+    setError('')
 
     const parentName =
       `${match.target_parent_first_name || ''} ${match.target_parent_last_name || ''}`.trim() ||
@@ -521,6 +529,8 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
       const message =
         err instanceof Error ? err.message : 'Erreur lors de l’envoi de la demande.'
       showPopup(message, 'error')
+    } finally {
+      setIsSendingRequest(false)
     }
   }
 
@@ -1068,6 +1078,7 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
                   type="button"
                   className={styles.secondaryButton}
                   onClick={closeConfirmPopup}
+                  disabled={isSendingRequest}
                 >
                   Annuler
                 </button>
@@ -1075,10 +1086,19 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
                   type="button"
                   className={styles.primaryButton}
                   onClick={confirmRequestContact}
+                  disabled={isSendingRequest}
                 >
-                  Envoyer
+                  {isSendingRequest ? 'Envoi...' : 'Envoyer'}
                 </button>
               </div>
+
+
+
+
+
+
+
+
             </div>
           </div>
         ) : null}
