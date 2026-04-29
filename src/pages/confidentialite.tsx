@@ -6,10 +6,10 @@ export default function ConfidentialitePage() {
   return (
     <>
       <Head>
-        <title>Confidentialité - TrajetEcole</title>
+        <title>Confidentialité - TrajetÉcole</title>
         <meta
           name="description"
-          content="Comment TrajetEcole utilise et protège vos données."
+          content="Comment TrajetÉcole utilise les données nécessaires au fonctionnement du service et protège les coordonnées des familles."
         />
       </Head>
 
@@ -17,32 +17,50 @@ export default function ConfidentialitePage() {
         <section className={styles.legalSection}>
           <div className={styles.container}>
             <div className={styles.legalHeader}>
-              <div className={styles.badge}>TrajetEcole</div>
+              <div className={styles.badge}>🔒 Données privées</div>
+
               <h1 className={styles.legalTitle}>Confidentialité</h1>
+
               <p className={styles.legalIntro}>
-                Vos données servent uniquement à faire fonctionner le service
-                et à faciliter la mise en relation entre familles.
+                TrajetÉcole utilise uniquement les informations nécessaires au fonctionnement du
+                service : créer votre compte, enregistrer vos trajets, rechercher des familles
+                compatibles et gérer les demandes de mise en relation.
+              </p>
+
+              <p className={styles.legalIntro}>
+                Vos coordonnées ne sont jamais affichées publiquement.
               </p>
             </div>
 
-            <div className={styles.legalCard}>
-              <h2>En bref</h2>
-              <ul className={styles.legalList}>
-                <li>vous gardez la main sur vos informations ;</li>
-                <li>la mise en relation ne se fait jamais automatiquement ;</li>
-                <li>vous pouvez demander la suppression de vos données.</li>
-              </ul>
+            <div className={styles.stepsGrid}>
+              <div className={styles.stepCard}>
+                <div className={styles.stepNumber}>1</div>
+                <h3>Vous gardez le contrôle</h3>
+                <p>Vous choisissez les trajets que vous ajoutez et les demandes que vous acceptez.</p>
+              </div>
+
+              <div className={styles.stepCard}>
+                <div className={styles.stepNumber}>2</div>
+                <h3>Pas de contact automatique</h3>
+                <p>Une mise en relation n’a lieu que si les deux familles sont d’accord.</p>
+              </div>
+
+              <div className={styles.stepCard}>
+                <div className={styles.stepNumber}>3</div>
+                <h3>Suppression possible</h3>
+                <p>Vous pouvez demander la suppression de vos données depuis le site.</p>
+              </div>
             </div>
 
             <div className={styles.legalCard}>
-              <h2>Données utilisées</h2>
+              <h2>Quelles données sont utilisées ?</h2>
               <ul className={styles.legalList}>
                 <li>vos informations de compte ;</li>
                 <li>les enfants et trajets que vous enregistrez ;</li>
                 <li>les jours, horaires et lieux associés ;</li>
                 <li>les demandes de mise en relation ;</li>
                 <li>les messages envoyés à l’administrateur ;</li>
-                <li>les données techniques utiles au bon fonctionnement du site.</li>
+                <li>certaines données techniques nécessaires au bon fonctionnement du site.</li>
               </ul>
             </div>
 
@@ -50,7 +68,7 @@ export default function ConfidentialitePage() {
               <h2>Pourquoi ces données ?</h2>
               <ul className={styles.legalList}>
                 <li>vous permettre de vous connecter ;</li>
-                <li>enregistrer et afficher vos trajets ;</li>
+                <li>afficher et gérer vos trajets ;</li>
                 <li>rechercher des familles compatibles ;</li>
                 <li>gérer les demandes entre parents ;</li>
                 <li>envoyer les emails utiles au service ;</li>
@@ -59,38 +77,42 @@ export default function ConfidentialitePage() {
             </div>
 
             <div className={styles.legalCard}>
-              <h2>Mise en relation</h2>
+              <h2>Mise en relation entre familles</h2>
               <p>
-                Les coordonnées ne sont pas partagées librement.
-                Une famille doit d’abord envoyer une demande, puis l’autre famille
-                doit l’accepter.
+                Les coordonnées ne sont pas partagées librement. Une famille peut envoyer une
+                demande de contact. L’autre famille doit l’accepter avant toute mise en relation
+                directe.
               </p>
             </div>
 
             <div className={styles.legalCard}>
               <h2>Suppression des données</h2>
               <p>
-                Vous pouvez demander la suppression de vos données depuis la plateforme.
-                Certaines informations techniques ou d’historique peuvent être conservées
-                si cela est nécessaire au bon fonctionnement du service ou au suivi des échanges.
+                Vous pouvez demander la suppression de vos données depuis la plateforme. Certaines
+                informations techniques ou d’historique peuvent être conservées temporairement si
+                cela est nécessaire au bon fonctionnement du service ou au suivi des demandes.
               </p>
             </div>
 
             <div className={styles.legalCard}>
               <h2>Une question ?</h2>
               <p>
-                Si vous avez une question sur vos données ou sur le fonctionnement du site,
-                vous pouvez contacter l’administrateur.
+                Pour toute question sur vos données ou le fonctionnement du site, vous pouvez
+                contacter l’administrateur.
               </p>
             </div>
 
             <div className={styles.legalActions}>
-              <Link href="/" className={styles.secondaryButton}>
-                Retour à l’accueil
-              </Link>
-
               <Link href="/contact-admin" className={styles.primaryButton}>
                 Contacter l’administrateur
+              </Link>
+
+              <Link href="/delete-my-data" className={styles.secondaryButton}>
+                Supprimer mes données
+              </Link>
+
+              <Link href="/" className={styles.secondaryButton}>
+                Retour à l’accueil
               </Link>
             </div>
           </div>

@@ -57,10 +57,10 @@ export default function HomePage() {
   return (
     <>
       <Head>
-        <title>Organisez plus simplement les trajets scolaires - Bourg-la-Reine | TrajetEcole</title>
+        <title>TrajetÉcole - Organisez les trajets de vos enfants à Bourg-la-Reine</title>
         <meta
           name="description"
-          content="TrajetEcole aide les parents de Bourg-la-Reine à organiser plus simplement les trajets scolaires et activités entre familles compatibles."
+          content="TrajetÉcole aide les familles de Bourg-la-Reine à trouver des trajets compatibles pour les enfants : école, activités, conservatoire, sport."
         />
       </Head>
 
@@ -69,16 +69,34 @@ export default function HomePage() {
           <div className={styles.container}>
             <div className={styles.heroGrid}>
               <div className={styles.heroLeft}>
-                <div className={styles.badge}>Trajets école ↔ activités entre parents</div>
+                <div className={styles.badge}>
+                  Local · Gratuit pour les familles · Données privées
+                </div>
 
                 <h1 className={styles.heroTitle}>
-                  Organisez plus simplement les trajets scolaires à Bourg-la-Reine
+                  Organisez plus facilement les trajets de vos enfants
                 </h1>
 
                 <p className={styles.heroText}>
-                  Trouvez plus facilement des familles compatibles pour les trajets école et
-                  activités du quotidien.
+                  Beaucoup de parents font les mêmes trajets sans le savoir. TrajetÉcole aide les
+                  familles de Bourg-la-Reine à trouver des trajets compatibles vers l’école, les
+                  activités, le conservatoire ou le sport.
                 </p>
+
+                <div className={styles.heroBenefits}>
+                  <div className={styles.benefitItem}>
+                    <span className={styles.benefitIcon}>📍</span>
+                    <span>Local</span>
+                  </div>
+                  <div className={styles.benefitItem}>
+                    <span className={styles.benefitIcon}>✅</span>
+                    <span>Gratuit pour les familles</span>
+                  </div>
+                  <div className={styles.benefitItem}>
+                    <span className={styles.benefitIcon}>🔒</span>
+                    <span>Contact uniquement après accord</span>
+                  </div>
+                </div>
 
                 {isAuthChecked && isLoggedIn ? (
                   <>
@@ -103,11 +121,11 @@ export default function HomePage() {
                 ) : (
                   <div className={styles.heroButtons}>
                     <Link href="/signup" className={styles.primaryButton}>
-                      Créer un compte
+                      Créer mon compte
                     </Link>
 
-                    <Link href="/login" className={styles.secondaryButton}>
-                      Se connecter
+                    <Link href="#comment-ca-marche" className={styles.secondaryButton}>
+                      Comment ça marche ?
                     </Link>
                   </div>
                 )}
@@ -118,7 +136,7 @@ export default function HomePage() {
                   <div className={styles.mockupTopbar}>
                     <div className={styles.mockupBrand}>
                       <span className={styles.mockupLogo}>●</span>
-                      <span>TrajetEcole</span>
+                      <span>TrajetÉcole</span>
                     </div>
                     <div className={styles.mockupDots}>
                       <span />
@@ -140,7 +158,7 @@ export default function HomePage() {
                     <div className={styles.schoolCard}>🏫 Maison → École</div>
 
                     <div className={styles.matchCard}>
-                      <div className={styles.matchTitle}>3 correspondances trouvées</div>
+                      <div className={styles.matchTitle}>Familles compatibles</div>
                       <div className={styles.matchLines}>
                         <span></span>
                         <span></span>
@@ -158,27 +176,27 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className={styles.stepsSection}>
+        <section id="comment-ca-marche" className={styles.stepsSection}>
           <div className={styles.container}>
             <h2 className={styles.sectionTitle}>Comment ça marche ?</h2>
 
             <div className={styles.stepsGrid}>
               <div className={styles.stepCard}>
                 <div className={styles.stepNumber}>1</div>
-                <h3>Ajouter un trajet</h3>
-                <p>Jours, horaires, lieux.</p>
+                <h3>Ajoutez vos trajets</h3>
+                <p>Indiquez les lieux, les jours et les horaires.</p>
               </div>
 
               <div className={styles.stepCard}>
                 <div className={styles.stepNumber}>2</div>
-                <h3>Voir les correspondances</h3>
-                <p>Familles compatibles.</p>
+                <h3>Découvrez les familles compatibles</h3>
+                <p>Le site recherche les trajets proches ou similaires.</p>
               </div>
 
               <div className={styles.stepCard}>
                 <div className={styles.stepNumber}>3</div>
-                <h3>Envoyer une demande</h3>
-                <p>Suivi dans Mon espace.</p>
+                <h3>Demandez une mise en relation</h3>
+                <p>Le contact se fait uniquement si les deux familles acceptent.</p>
               </div>
             </div>
           </div>
@@ -186,26 +204,22 @@ export default function HomePage() {
 
         <section className={styles.featuresSection}>
           <div className={styles.container}>
-            <h2 className={styles.sectionTitle}>Une aide concrète au quotidien</h2>
+            <h2 className={styles.sectionTitle}>Pourquoi s’inscrire ?</h2>
 
-            <div className={styles.featuresGrid}>
-              <div className={styles.featureCard}>
-                <div className={styles.featureIllustration}>⏰</div>
-                <h3>Gain de temps</h3>
-                <p>Trouvez rapidement des solutions.</p>
-              </div>
+            <div className={styles.privacyBox}>
+              <p className={styles.privacyText}>
+                Plus il y a de familles inscrites, plus les correspondances deviennent utiles.
+              </p>
 
-              <div className={styles.featureCard}>
-                <div className={styles.featureIllustration}>🗂️</div>
-                <h3>Organisation claire</h3>
-                <p>Tout est regroupé ici.</p>
-              </div>
-
-              <div className={styles.featureCard}>
-                <div className={styles.featureIllustration}>✅</div>
-                <h3>Cadre rassurant</h3>
-                <p>Mise en relation encadrée.</p>
-              </div>
+              {isAuthChecked && isLoggedIn ? (
+                <Link href="/dashboard" className={styles.primaryButton}>
+                  Accéder à mon espace
+                </Link>
+              ) : (
+                <Link href="/signup" className={styles.primaryButton}>
+                  Rejoindre le réseau local
+                </Link>
+              )}
             </div>
           </div>
         </section>
@@ -214,14 +228,34 @@ export default function HomePage() {
           <div className={styles.container}>
             <div className={styles.privacyBox}>
               <h2 className={styles.sectionTitle}>Confidentialité</h2>
+
               <p className={styles.privacyText}>
-                Vos données sont utilisées pour faire fonctionner le service et peuvent être
-                supprimées sur demande.
+                Coordonnées privées · Pas d’affichage public · Contact uniquement après accord
               </p>
 
-              <Link href="/confidentialite" className={styles.primaryButton}>
-                Lire la politique de confidentialité
+              <Link href="/confidentialite" className={styles.secondaryButton}>
+                En savoir plus sur la confidentialité
               </Link>
+            </div>
+          </div>
+        </section>
+
+        <section className={styles.featuresSection}>
+          <div className={styles.container}>
+            <div className={styles.privacyBox}>
+              <h2 className={styles.sectionTitle}>
+                Vous faites régulièrement des trajets pour vos enfants à Bourg-la-Reine ?
+              </h2>
+
+              {isAuthChecked && isLoggedIn ? (
+                <Link href="/dashboard" className={styles.primaryButton}>
+                  Aller dans mon espace
+                </Link>
+              ) : (
+                <Link href="/signup" className={styles.primaryButton}>
+                  Créer mon compte gratuitement
+                </Link>
+              )}
             </div>
           </div>
         </section>
@@ -229,9 +263,14 @@ export default function HomePage() {
         <section className={styles.quickLinksSection}>
           <div className={styles.container}>
             <div className={styles.quickLinksGrid}>
+              <Link href="/qui-sommes-nous" className={styles.quickLinkCard}>
+                <div className={styles.quickLinkIcon}>🏡</div>
+                <span>Qui sommes-nous ?</span>
+              </Link>
+
               <Link href="/contact-admin" className={styles.quickLinkCard}>
                 <div className={styles.quickLinkIcon}>✉️</div>
-                <span>Contacter l&apos;admin</span>
+                <span>Contacter l’admin</span>
               </Link>
 
               <Link href="/delete-my-data" className={styles.quickLinkCard}>
