@@ -57,10 +57,10 @@ export default function HomePage() {
   return (
     <>
       <Head>
-        <title>TrajetÉcole - Organisez les trajets des enfants à Bourg-la-Reine</title>
+        <title>TrajetÉcole - Trajets des enfants à Bourg-la-Reine</title>
         <meta
           name="description"
-          content="TrajetÉcole aide les familles à trouver des trajets compatibles vers l’école, les activités, le conservatoire ou le sport à Bourg-la-Reine."
+          content="TrajetÉcole aide les familles à trouver des trajets compatibles vers l’école, les activités, le conservatoire ou le sport."
         />
       </Head>
 
@@ -68,7 +68,7 @@ export default function HomePage() {
         <section className={styles.hero}>
           <div className={styles.container}>
             <div className={styles.heroGrid}>
-              <div className={styles.heroLeft}>
+              <div>
                 <div className={styles.badge}>
                   Local · Gratuit · Données privées · Contact uniquement après accord
                 </div>
@@ -179,7 +179,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section id="comment-ca-marche" className={styles.stepsSection}>
+        <section className={styles.stepsSection}>
           <div className={styles.container}>
             <h2 className={styles.sectionTitle}>Comment ça marche ?</h2>
 
@@ -227,6 +227,7 @@ export default function HomePage() {
           </div>
         </section>
 
+
         <section className={styles.privacySection}>
           <div className={styles.container}>
             <h2 className={styles.sectionTitle}>Confidentialité</h2>
@@ -239,25 +240,30 @@ export default function HomePage() {
               </div>
 
               <div className={styles.featureCard}>
-                <div className={styles.featureIllustration}>👁️</div>
-                <h3>Pas d’affichage public</h3>
-                <p>Les familles ne voient pas librement vos coordonnées.</p>
-              </div>
-
-              <div className={styles.featureCard}>
                 <div className={styles.featureIllustration}>🤝</div>
                 <h3>Contact après accord</h3>
                 <p>Une mise en relation se fait seulement si les deux familles acceptent.</p>
               </div>
+
+              <div className={styles.featureCard}>
+                <div className={styles.featureIllustration}>🗑️</div>
+                <h3>Suppression possible</h3>
+                <p>Vous pouvez demander la suppression de vos données depuis le site.</p>
+              </div>
             </div>
 
-            <div className={styles.centerActions}>
+            <div className={styles.privacyBox} style={{ marginTop: 24 }}>
               <Link href="/confidentialite" className={styles.secondaryButton}>
                 En savoir plus sur la confidentialité
               </Link>
             </div>
           </div>
         </section>
+
+
+
+
+
 
         <section className={styles.quickLinksSection}>
           <div className={styles.container}>

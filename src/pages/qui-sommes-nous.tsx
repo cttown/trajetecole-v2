@@ -21,7 +21,7 @@ export default function QuiSommesNousPage() {
               <h1 className={styles.legalTitle}>Qui sommes-nous ?</h1>
             </div>
 
-            <div className={styles.aboutCardsGrid}>
+            <div className={styles.featuresGrid}>
               <div className={styles.featureCard}>
                 <div className={styles.featureIllustration}>🏡</div>
                 <h3>Initiative locale</h3>
@@ -36,79 +36,71 @@ export default function QuiSommesNousPage() {
 
               <div className={styles.featureCard}>
                 <div className={styles.featureIllustration}>✅</div>
-                <h3>Gratuit pour les familles</h3>
+                <h3>Gratuit</h3>
                 <p>L’utilisation du site est gratuite.</p>
-              </div>
-
-              <div className={styles.featureCard}>
-                <div className={styles.featureIllustration}>🔒</div>
-                <h3>Vie privée respectée</h3>
-                <p>Les coordonnées ne sont pas affichées publiquement.</p>
-              </div>
-
-              <div className={styles.featureCard}>
-                <div className={styles.featureIllustration}>📌</div>
-                <h3>Projet indépendant</h3>
-                <p>Le site n’est pas un service officiel de la mairie ou des écoles.</p>
               </div>
             </div>
 
-            <div className={styles.aboutContentGrid}>
-              <div className={styles.aboutContentCard}>
-                <div className={styles.aboutContentIcon}>💡</div>
-                <div>
-                  <h2>Pourquoi ce site ?</h2>
-                  <p>
-                    Comme beaucoup de parents, j’ai constaté que plusieurs familles font souvent
-                    des trajets similaires — école, activités, conservatoire, sport — sans
-                    forcément se connaître.
-                  </p>
-                  <p>
-                    TrajetÉcole a donc été créé pour faciliter les mises en relation entre parents
-                    de Bourg-la-Reine, dans un cadre simple, volontaire et respectueux de la vie
-                    privée.
-                  </p>
-                </div>
-              </div>
+            <div className={styles.legalCard} style={{ marginTop: 24 }}>
+              <h2 style={{ fontSize: 28, lineHeight: 1.25 }}>Pourquoi ce site ?</h2>
+              <p>
+                À Bourg-la-Reine, beaucoup de familles accompagnent leurs enfants vers les mêmes
+                écoles, activités, clubs sportifs ou le conservatoire, souvent aux mêmes horaires.
+              </p>
+              <p style={{ marginTop: 12 }}>
+                TrajetÉcole est né d’un constat simple : ces trajets existent déjà, mais les
+                familles ne savent pas toujours qu’elles pourraient s’entraider.
+              </p>
+            </div>
 
-              <div className={styles.aboutContentCard}>
-                <div className={styles.aboutContentIcon}>✅</div>
-                <div>
-                  <h2>Un service gratuit pour les familles</h2>
-                  <p>
-                    L’utilisation du site est gratuite pour les familles. L’objectif est de
-                    favoriser l’entraide locale entre parents de Bourg-la-Reine.
-                  </p>
-                </div>
-              </div>
+            <div className={styles.legalCard}>
+              <h2 style={{ fontSize: 28, lineHeight: 1.25 }}>Ce que permet TrajetÉcole</h2>
+              <p>
+                Le site permet aux parents d’indiquer leurs trajets réguliers et de repérer
+                d’autres familles ayant des trajets proches ou compatibles.
+              </p>
+              <p style={{ marginTop: 12 }}>
+                L’objectif n’est pas d’organiser automatiquement les déplacements, mais de faciliter
+                une première mise en relation entre parents.
+              </p>
+            </div>
 
-              <div className={styles.aboutContentCard}>
-                <div className={styles.aboutContentIcon}>🌱</div>
-                <div>
-                  <h2>Un projet qui évolue avec vos retours</h2>
-                  <p>
-                    Le site est encore jeune et s’améliorera progressivement grâce aux retours des
-                    familles utilisatrices.
-                  </p>
-                  <p>
-                    Toutes les suggestions sont les bienvenues : amélioration du site, ajout de
-                    lieux, correction d’un problème ou idée pour mieux répondre aux besoins des
-                    parents.
-                  </p>
-                </div>
-              </div>
+            <div className={styles.legalCard}>
+              <h2 style={{ fontSize: 28, lineHeight: 1.25 }}>
+                Un cadre volontaire et respectueux
+              </h2>
+              <p>
+                Chaque famille choisit les trajets qu’elle ajoute et les demandes qu’elle accepte.
+              </p>
+              <p style={{ marginTop: 12 }}>
+                Une mise en relation directe se fait uniquement après accord des deux familles.
+              </p>
+            </div>
 
-              <div className={styles.aboutContentCard}>
-                <div className={styles.aboutContentIcon}>📌</div>
-                <div>
-                  <h2>Une initiative indépendante</h2>
-                  <p>
-                    TrajetÉcole n’est pas un service officiel de la mairie ou des établissements
-                    scolaires. C’est une initiative indépendante, pensée pour favoriser l’entraide
-                    entre parents.
-                  </p>
-                </div>
-              </div>
+            <div className={styles.legalCard}>
+              <h2 style={{ fontSize: 28, lineHeight: 1.25 }}>
+                Un projet local qui évolue
+              </h2>
+              <p>
+                TrajetÉcole est encore jeune. Le site sera amélioré progressivement grâce aux
+                retours des familles utilisatrices.
+              </p>
+              <p style={{ marginTop: 12 }}>
+                Vous pouvez proposer une amélioration, signaler un problème ou suggérer l’ajout
+                d’un lieu utile à Bourg-la-Reine.
+              </p>
+            </div>
+
+            <div className={styles.legalCard}>
+              <h2 style={{ fontSize: 28, lineHeight: 1.25 }}>Une initiative indépendante</h2>
+              <p>
+                TrajetÉcole n’est pas un service officiel de la mairie, des écoles ou des
+                associations.
+              </p>
+              <p style={{ marginTop: 12 }}>
+                C’est une initiative indépendante, pensée pour encourager l’entraide locale entre
+                parents.
+              </p>
             </div>
 
             <div className={styles.legalActions}>
