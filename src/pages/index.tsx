@@ -57,10 +57,10 @@ export default function HomePage() {
   return (
     <>
       <Head>
-        <title>TrajetÉcole - Organisez les trajets de vos enfants à Bourg-la-Reine</title>
+        <title>TrajetÉcole - Organisez les trajets des enfants à Bourg-la-Reine</title>
         <meta
           name="description"
-          content="TrajetÉcole aide les familles de Bourg-la-Reine à trouver des trajets compatibles pour les enfants : école, activités, conservatoire, sport."
+          content="TrajetÉcole aide les familles à trouver des trajets compatibles vers l’école, les activités, le conservatoire ou le sport à Bourg-la-Reine."
         />
       </Head>
 
@@ -70,17 +70,17 @@ export default function HomePage() {
             <div className={styles.heroGrid}>
               <div className={styles.heroLeft}>
                 <div className={styles.badge}>
-                  Local · Gratuit pour les familles · Données privées
+                  Local · Gratuit · Données privées · Contact uniquement après accord
                 </div>
 
                 <h1 className={styles.heroTitle}>
-                  Organisez plus facilement les trajets de vos enfants
+                  Organisez plus facilement les trajets de vos enfants à Bourg-la-Reine
                 </h1>
 
                 <p className={styles.heroText}>
                   Beaucoup de parents font les mêmes trajets sans le savoir. TrajetÉcole aide les
-                  familles de Bourg-la-Reine à trouver des trajets compatibles vers l’école, les
-                  activités, le conservatoire ou le sport.
+                  familles à trouver des trajets compatibles vers l’école, les activités, le
+                  conservatoire ou le sport.
                 </p>
 
                 <div className={styles.heroBenefits}>
@@ -88,13 +88,15 @@ export default function HomePage() {
                     <span className={styles.benefitIcon}>📍</span>
                     <span>Local</span>
                   </div>
+
                   <div className={styles.benefitItem}>
                     <span className={styles.benefitIcon}>✅</span>
-                    <span>Gratuit pour les familles</span>
+                    <span>Gratuit</span>
                   </div>
+
                   <div className={styles.benefitItem}>
                     <span className={styles.benefitIcon}>🔒</span>
-                    <span>Contact uniquement après accord</span>
+                    <span>Contact après accord</span>
                   </div>
                 </div>
 
@@ -124,8 +126,8 @@ export default function HomePage() {
                       Créer mon compte
                     </Link>
 
-                    <Link href="#comment-ca-marche" className={styles.secondaryButton}>
-                      Comment ça marche ?
+                    <Link href="/login" className={styles.secondaryButton}>
+                      Se connecter
                     </Link>
                   </div>
                 )}
@@ -138,6 +140,7 @@ export default function HomePage() {
                       <span className={styles.mockupLogo}>●</span>
                       <span>TrajetÉcole</span>
                     </div>
+
                     <div className={styles.mockupDots}>
                       <span />
                       <span />
@@ -208,7 +211,7 @@ export default function HomePage() {
 
             <div className={styles.privacyBox}>
               <p className={styles.privacyText}>
-                Plus il y a de familles inscrites, plus les correspondances deviennent utiles.
+                Chaque famille inscrite augmente les chances de trouver des trajets compatibles.
               </p>
 
               {isAuthChecked && isLoggedIn ? (
@@ -217,7 +220,7 @@ export default function HomePage() {
                 </Link>
               ) : (
                 <Link href="/signup" className={styles.primaryButton}>
-                  Rejoindre le réseau local
+                  Créer mon compte
                 </Link>
               )}
             </div>
@@ -226,36 +229,32 @@ export default function HomePage() {
 
         <section className={styles.privacySection}>
           <div className={styles.container}>
-            <div className={styles.privacyBox}>
-              <h2 className={styles.sectionTitle}>Confidentialité</h2>
+            <h2 className={styles.sectionTitle}>Confidentialité</h2>
 
-              <p className={styles.privacyText}>
-                Coordonnées privées · Pas d’affichage public · Contact uniquement après accord
-              </p>
+            <div className={styles.featuresGrid}>
+              <div className={styles.featureCard}>
+                <div className={styles.featureIllustration}>🔒</div>
+                <h3>Coordonnées privées</h3>
+                <p>Vos informations personnelles ne sont pas affichées publiquement.</p>
+              </div>
 
+              <div className={styles.featureCard}>
+                <div className={styles.featureIllustration}>👁️</div>
+                <h3>Pas d’affichage public</h3>
+                <p>Les familles ne voient pas librement vos coordonnées.</p>
+              </div>
+
+              <div className={styles.featureCard}>
+                <div className={styles.featureIllustration}>🤝</div>
+                <h3>Contact après accord</h3>
+                <p>Une mise en relation se fait seulement si les deux familles acceptent.</p>
+              </div>
+            </div>
+
+            <div className={styles.centerActions}>
               <Link href="/confidentialite" className={styles.secondaryButton}>
                 En savoir plus sur la confidentialité
               </Link>
-            </div>
-          </div>
-        </section>
-
-        <section className={styles.featuresSection}>
-          <div className={styles.container}>
-            <div className={styles.privacyBox}>
-              <h2 className={styles.sectionTitle}>
-                Vous faites régulièrement des trajets pour vos enfants à Bourg-la-Reine ?
-              </h2>
-
-              {isAuthChecked && isLoggedIn ? (
-                <Link href="/dashboard" className={styles.primaryButton}>
-                  Aller dans mon espace
-                </Link>
-              ) : (
-                <Link href="/signup" className={styles.primaryButton}>
-                  Créer mon compte gratuitement
-                </Link>
-              )}
             </div>
           </div>
         </section>
@@ -270,7 +269,7 @@ export default function HomePage() {
 
               <Link href="/contact-admin" className={styles.quickLinkCard}>
                 <div className={styles.quickLinkIcon}>✉️</div>
-                <span>Contacter l’admin</span>
+                <span>Contacter l&apos;admin</span>
               </Link>
 
               <Link href="/delete-my-data" className={styles.quickLinkCard}>
