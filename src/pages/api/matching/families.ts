@@ -5,8 +5,16 @@ type TripRow = {
   id: string
   family_id: string
   child_id: string
+  from_location_type: 'place' | 'private_address'
+  to_location_type: 'place' | 'private_address'
   from_place_id: string | null
   to_place_id: string | null
+  from_address: string | null
+  to_address: string | null
+  from_lat: number | null
+  from_lng: number | null
+  to_lat: number | null
+  to_lng: number | null
   from_place_suggestion_id: string | null
   to_place_suggestion_id: string | null
   day_of_week: number
@@ -41,8 +49,31 @@ type ContactRequestHistoryRow = {
   id: string
   requester_family_id: string
   target_family_id: string
-  status: 'pending' | 'accepted' | 'declined' | 'expired' | 'cancelled'
+  status:
+    | 'pending'
+    | 'accepted'
+    | 'declined'
+    | 'expired'
+    | 'cancelled'
+    | 'closed_no_agreement'
+    | 'closed_with_agreement'
   created_at: string
+}
+
+type HistoryInfo = {
+  history_status:
+    | 'none_yet'
+    | 'pending'
+    | 'accepted'
+    | 'declined_before'
+    | 'expired_before'
+    | 'cancelled_before'
+  history_label: string
+  history_score: number
+  history_score_normalized: number
+  badge_tone: 'green' | 'yellow' | 'red'
+  can_contact: boolean
+  contact_block_reason: string | null
 }
 
 function requireEnv(name: string): string {
@@ -63,91 +94,289 @@ function timeToMinutes(value: string | null): number | null {
   return hours * 60 + minutes
 }
 
-function formatTimeValue(value: string | null) {
-  if (!value) return '—'
-  return value.slice(0, 5)
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
 }
 
-function placeLabel(placeId: string | null, placeMap: Record<string, PlaceRow>) {
+function formatDistanceMeters(distanceMeters: number) {
+  // On n'affiche pas la distance exacte pour préserver la confidentialité.
+  // La distance précise reste utilisée uniquement en interne pour le score et le tri.
+  if (distanceMeters < 100) return 'à proximité immédiate'
+  if (distanceMeters < 300) return 'très proche'
+  if (distanceMeters <= 500) return 'proche'
+  return 'hors périmètre'
+}
+
+function getDistanceMeters(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number
+) {
+  const earthRadiusMeters = 6371000
+  const toRad = (value: number) => (value * Math.PI) / 180
+
+  const dLat = toRad(lat2 - lat1)
+  const dLng = toRad(lng2 - lng1)
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLng / 2) ** 2
+
+  return earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+function getDistanceScore(distanceMeters: number) {
+  if (distanceMeters < 20) return 30
+  if (distanceMeters < 100) return 25
+  if (distanceMeters < 200) return 20
+  if (distanceMeters < 300) return 15
+  if (distanceMeters <= 500) return 5
+  return 0
+}
+
+function getTimeScore(diffMinutes: number) {
+  if (diffMinutes <= 5) return 30
+  if (diffMinutes <= 10) return 25
+  if (diffMinutes <= 15) return 20
+  if (diffMinutes <= 30) return 10
+  return 0
+}
+
+function locationLabel(
+  locationType: TripRow['from_location_type'],
+  address: string | null,
+  placeId: string | null,
+  placeMap: Record<string, PlaceRow>
+) {
+  if (locationType === 'private_address') {
+    return address || 'Adresse privée'
+  }
+
   if (!placeId) return 'Lieu non renseigné'
+
   const place = placeMap[placeId]
   if (!place) return 'Lieu inconnu'
+
   return `${place.name} (${place.city})`
 }
 
 function isRequesterTripEligible(trip: TripRow): boolean {
   return (
     trip.status === 'searching' &&
-    !!trip.from_place_id &&
-    !!trip.to_place_id &&
-    !trip.from_place_suggestion_id &&
-    !trip.to_place_suggestion_id
+    isFiniteNumber(trip.from_lat) &&
+    isFiniteNumber(trip.from_lng) &&
+    isFiniteNumber(trip.to_lat) &&
+    isFiniteNumber(trip.to_lng)
   )
 }
 
 function isTargetTripEligible(trip: TripRow): boolean {
   return (
     (trip.status === 'searching' || trip.status === 'resolved_open') &&
-    !!trip.from_place_id &&
-    !!trip.to_place_id &&
-    !trip.from_place_suggestion_id &&
-    !trip.to_place_suggestion_id
+    isFiniteNumber(trip.from_lat) &&
+    isFiniteNumber(trip.from_lng) &&
+    isFiniteNumber(trip.to_lat) &&
+    isFiniteNumber(trip.to_lng)
   )
 }
 
-function computeHistoryInfo(history: ContactRequestHistoryRow | null) {
+function hoursSince(value: string) {
+  const createdAtMs = new Date(value).getTime()
+
+  if (!Number.isFinite(createdAtMs)) return Number.POSITIVE_INFINITY
+
+  return (Date.now() - createdAtMs) / (1000 * 60 * 60)
+}
+
+function normalizeHistoryScore(historyScore: number) {
+  // Valeur conservée pour l'ancien affichage : -10 => 0, 0 => 0.5, +10 => 1.
+  return Math.max(0, Math.min(1, (historyScore + 10) / 20))
+}
+
+function computeHistoryInfo(history: ContactRequestHistoryRow | null): HistoryInfo {
   if (!history) {
     return {
-      history_status: 'none_yet' as const,
-      history_label: 'Aucun échange récent',
-      history_score_normalized: 1,
-      badge_tone: 'green' as const,
+      history_status: 'none_yet',
+      history_label: 'Aucun échange historique',
+      history_score: 0,
+      history_score_normalized: normalizeHistoryScore(0),
+      badge_tone: 'green',
+      can_contact: true,
+      contact_block_reason: null,
     }
   }
 
   if (history.status === 'pending') {
+    const isRecentPending = hoursSince(history.created_at) < 24
+
+    if (isRecentPending) {
+      return {
+        history_status: 'pending',
+        history_label: 'Demande en attente',
+        history_score: 0,
+        history_score_normalized: normalizeHistoryScore(0),
+        badge_tone: 'yellow',
+        can_contact: false,
+        contact_block_reason:
+          'Demande déjà envoyée récemment. Vous pourrez refaire une demande plus tard.',
+      }
+    }
+
     return {
-      history_status: 'pending' as const,
-      history_label: 'Une demande est déjà en attente',
-      history_score_normalized: 0.2,
-      badge_tone: 'red' as const,
+      history_status: 'expired_before',
+      history_label: 'Demande déjà envoyée mais sans réponse',
+      history_score: -5,
+      history_score_normalized: normalizeHistoryScore(-5),
+      badge_tone: 'yellow',
+      can_contact: true,
+      contact_block_reason: null,
     }
   }
 
-  if (history.status === 'accepted') {
+  if (history.status === 'accepted' || history.status === 'closed_with_agreement') {
     return {
-      history_status: 'accepted' as const,
-      history_label: 'Une demande a déjà été acceptée',
-      history_score_normalized: 0.35,
-      badge_tone: 'yellow' as const,
+      history_status: 'accepted',
+      history_label: 'Mise en relation déjà acceptée',
+      history_score: 10,
+      history_score_normalized: normalizeHistoryScore(10),
+      badge_tone: 'green',
+      can_contact: true,
+      contact_block_reason: null,
     }
   }
 
-  if (history.status === 'declined') {
+  if (history.status === 'declined' || history.status === 'closed_no_agreement') {
     return {
-      history_status: 'declined_before' as const,
-      history_label: 'Une demande précédente a été refusée',
-      history_score_normalized: 0.55,
-      badge_tone: 'yellow' as const,
+      history_status: 'declined_before',
+      history_label: 'Demande déjà refusée',
+      history_score: -10,
+      history_score_normalized: normalizeHistoryScore(-10),
+      badge_tone: 'red',
+      can_contact: true,
+      contact_block_reason: null,
     }
   }
 
   if (history.status === 'expired') {
     return {
-      history_status: 'expired_before' as const,
-      history_label: 'Une demande précédente a expiré',
-      history_score_normalized: 0.7,
-      badge_tone: 'yellow' as const,
+      history_status: 'expired_before',
+      history_label: 'Demande déjà envoyée mais sans réponse',
+      history_score: -5,
+      history_score_normalized: normalizeHistoryScore(-5),
+      badge_tone: 'yellow',
+      can_contact: true,
+      contact_block_reason: null,
     }
   }
 
   return {
-    history_status: 'cancelled_before' as const,
-    history_label: 'Une demande précédente a été annulée',
-    history_score_normalized: 0.75,
-    badge_tone: 'yellow' as const,
+    history_status: 'cancelled_before',
+    history_label: 'Demande précédente annulée',
+    history_score: 0,
+    history_score_normalized: normalizeHistoryScore(0),
+    badge_tone: 'yellow',
+    can_contact: true,
+    contact_block_reason: null,
   }
 }
+
+function compareTrips(
+  requesterTrip: TripRow,
+  targetTrip: TripRow,
+  historyInfo: HistoryInfo,
+  placeMap: Record<string, PlaceRow>,
+  childMap: Record<string, ChildRow>
+) {
+  if (requesterTrip.day_of_week !== targetTrip.day_of_week) return null
+
+  if (
+    !isFiniteNumber(requesterTrip.from_lat) ||
+    !isFiniteNumber(requesterTrip.from_lng) ||
+    !isFiniteNumber(requesterTrip.to_lat) ||
+    !isFiniteNumber(requesterTrip.to_lng) ||
+    !isFiniteNumber(targetTrip.from_lat) ||
+    !isFiniteNumber(targetTrip.from_lng) ||
+    !isFiniteNumber(targetTrip.to_lat) ||
+    !isFiniteNumber(targetTrip.to_lng)
+  ) {
+    return null
+  }
+
+  const fromDistanceMeters = getDistanceMeters(
+    requesterTrip.from_lat,
+    requesterTrip.from_lng,
+    targetTrip.from_lat,
+    targetTrip.from_lng
+  )
+
+  if (fromDistanceMeters > 500) return null
+
+  const toDistanceMeters = getDistanceMeters(
+    requesterTrip.to_lat,
+    requesterTrip.to_lng,
+    targetTrip.to_lat,
+    targetTrip.to_lng
+  )
+
+  if (toDistanceMeters > 500) return null
+
+  const requesterFromMin = timeToMinutes(requesterTrip.from_time)
+  const targetFromMin = timeToMinutes(targetTrip.from_time)
+
+  if (requesterFromMin === null || targetFromMin === null) return null
+
+  const timeDiffMin = Math.abs(requesterFromMin - targetFromMin)
+
+  if (timeDiffMin > 30) return null
+
+  const fromDistanceScore = getDistanceScore(fromDistanceMeters)
+  const toDistanceScore = getDistanceScore(toDistanceMeters)
+  const timeScore = getTimeScore(timeDiffMin)
+  const compatibilityScore =
+    fromDistanceScore + toDistanceScore + timeScore + historyInfo.history_score
+
+  return {
+    requester_trip_id: requesterTrip.id,
+    requester_trip_group_id: requesterTrip.trip_group_id,
+    requester_child_first_name: childMap[requesterTrip.child_id]?.first_name || null,
+    requester_from_label: locationLabel(
+      requesterTrip.from_location_type,
+      requesterTrip.from_address,
+      requesterTrip.from_place_id,
+      placeMap
+    ),
+    requester_to_label: locationLabel(
+      requesterTrip.to_location_type,
+      requesterTrip.to_address,
+      requesterTrip.to_place_id,
+      placeMap
+    ),
+    requester_from_time: requesterTrip.from_time,
+    requester_to_time: requesterTrip.to_time,
+    target_trip_id: targetTrip.id,
+    target_trip_group_id: targetTrip.trip_group_id,
+    target_from_time: targetTrip.from_time,
+    target_to_time: targetTrip.to_time,
+    day_of_week: requesterTrip.day_of_week,
+    time_diff_min: timeDiffMin,
+    allowed_diff_min: 30,
+    time_fit_score: Math.round((timeScore / 30) * 100),
+    from_distance_m: Math.round(fromDistanceMeters),
+    to_distance_m: Math.round(toDistanceMeters),
+    from_distance_label: formatDistanceMeters(fromDistanceMeters),
+    to_distance_label: formatDistanceMeters(toDistanceMeters),
+    from_distance_score: fromDistanceScore,
+    to_distance_score: toDistanceScore,
+    time_score: timeScore,
+    history_score: historyInfo.history_score,
+    compatibility_score: compatibilityScore,
+  }
+}
+
+type TripMatch = NonNullable<ReturnType<typeof compareTrips>>
 
 export default async function handler(
   req: NextApiRequest,
@@ -194,8 +423,16 @@ export default async function handler(
         id,
         family_id,
         child_id,
+        from_location_type,
+        to_location_type,
         from_place_id,
         to_place_id,
+        from_address,
+        to_address,
+        from_lat,
+        from_lng,
+        to_lat,
+        to_lng,
         from_place_suggestion_id,
         to_place_suggestion_id,
         day_of_week,
@@ -228,8 +465,16 @@ export default async function handler(
         id,
         family_id,
         child_id,
+        from_location_type,
+        to_location_type,
         from_place_id,
         to_place_id,
+        from_address,
+        to_address,
+        from_lat,
+        from_lng,
+        to_lat,
+        to_lng,
         from_place_suggestion_id,
         to_place_suggestion_id,
         day_of_week,
@@ -270,6 +515,13 @@ export default async function handler(
 
     const childIds = Array.from(new Set(requesterTrips.map((trip) => trip.child_id)))
 
+    const contactHistoryQuery = targetFamilyIds
+      .map(
+        (targetFamilyId) =>
+          `and(requester_family_id.eq.${requesterFamily.id},target_family_id.eq.${targetFamilyId}),and(target_family_id.eq.${requesterFamily.id},requester_family_id.eq.${targetFamilyId})`
+      )
+      .join(',')
+
     const [
       { data: targetFamiliesData, error: targetFamiliesError },
       { data: placesData, error: placesError },
@@ -286,13 +538,13 @@ export default async function handler(
       childIds.length > 0
         ? supabaseAdmin.from('children').select('id, first_name').in('id', childIds)
         : Promise.resolve({ data: [], error: null }),
-      supabaseAdmin
-        .from('contact_requests')
-        .select('id, requester_family_id, target_family_id, status, created_at')
-        .or(
-          `and(requester_family_id.eq.${requesterFamily.id},target_family_id.in.(${targetFamilyIds.join(',')})),and(target_family_id.eq.${requesterFamily.id},requester_family_id.in.(${targetFamilyIds.join(',')}))`
-        )
-        .order('created_at', { ascending: false }),
+      contactHistoryQuery
+        ? supabaseAdmin
+            .from('contact_requests')
+            .select('id, requester_family_id, target_family_id, status, created_at')
+            .or(contactHistoryQuery)
+            .order('created_at', { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
     ])
 
     if (targetFamiliesError) {
@@ -340,55 +592,17 @@ export default async function handler(
     const results = targetFamilies
       .map((family) => {
         const candidateTrips = targetTripsByFamilyId.get(family.id) ?? []
-        const tripMatches: any[] = []
+        const history = latestHistoryByTargetFamilyId.get(family.id) ?? null
+        const historyInfo = computeHistoryInfo(history)
+        const tripMatches: TripMatch[] = []
 
         for (const requesterTrip of requesterTrips) {
           const compatibleTrips = candidateTrips
-            .map((targetTrip) => {
-              if (requesterTrip.day_of_week !== targetTrip.day_of_week) return null
-              if (requesterTrip.from_place_id !== targetTrip.from_place_id) return null
-              if (requesterTrip.to_place_id !== targetTrip.to_place_id) return null
-
-              const requesterFromMin = timeToMinutes(requesterTrip.from_time)
-              const targetFromMin = timeToMinutes(targetTrip.from_time)
-
-              if (requesterFromMin === null || targetFromMin === null) return null
-
-              const timeDiffMin = Math.abs(requesterFromMin - targetFromMin)
-              const allowedDiffMin = Math.min(
-                requesterTrip.tolerance_min,
-                targetTrip.tolerance_min
-              )
-
-              if (timeDiffMin > allowedDiffMin) return null
-
-              const timeFitScore =
-                allowedDiffMin === 0
-                  ? timeDiffMin === 0
-                    ? 100
-                    : 0
-                  : Math.max(0, Math.round(100 * (1 - timeDiffMin / allowedDiffMin)))
-
-              return {
-                requester_trip_id: requesterTrip.id,
-                requester_trip_group_id: requesterTrip.trip_group_id,
-                requester_child_first_name: childMap[requesterTrip.child_id]?.first_name || null,
-                requester_from_label: placeLabel(requesterTrip.from_place_id, placeMap),
-                requester_to_label: placeLabel(requesterTrip.to_place_id, placeMap),
-                requester_from_time: requesterTrip.from_time,
-                requester_to_time: requesterTrip.to_time,
-                target_trip_id: targetTrip.id,
-                target_trip_group_id: targetTrip.trip_group_id,
-                target_from_time: targetTrip.from_time,
-                target_to_time: targetTrip.to_time,
-                day_of_week: requesterTrip.day_of_week,
-                time_diff_min: timeDiffMin,
-                allowed_diff_min: allowedDiffMin,
-                time_fit_score: timeFitScore,
-              }
-            })
-            .filter(Boolean)
-            .sort((a: any, b: any) => b.time_fit_score - a.time_fit_score)
+            .map((targetTrip) =>
+              compareTrips(requesterTrip, targetTrip, historyInfo, placeMap, childMap)
+            )
+            .filter((item): item is TripMatch => item !== null)
+            .sort((a, b) => b.compatibility_score - a.compatibility_score)
 
           if (compatibleTrips.length > 0) {
             tripMatches.push(compatibleTrips[0])
@@ -410,25 +624,30 @@ export default async function handler(
           tripMatches.reduce((sum, item) => sum + item.time_fit_score, 0) / tripMatches.length
         )
 
-        const history = latestHistoryByTargetFamilyId.get(family.id) ?? null
-        const historyInfo = computeHistoryInfo(history)
-
-        const tripCompatibilityScore = Math.round(coverageRatio * 100)
-        const compatibilityScore = Math.round(
-          tripCompatibilityScore * 0.55 +
-            averageTimeFitScore * 0.3 +
-            historyInfo.history_score_normalized * 100 * 0.15
+        const averageTripScoreWithoutHistory = Math.round(
+          tripMatches.reduce(
+            (sum, item) =>
+              sum + item.from_distance_score + item.to_distance_score + item.time_score,
+            0
+          ) / tripMatches.length
         )
 
-        let badge_label = 'Compatible'
-        let badge_tone: 'green' | 'yellow' | 'red' = 'yellow'
+        const compatibilityScore = Math.round(
+          tripMatches.reduce((sum, item) => sum + item.compatibility_score, 0) /
+            tripMatches.length
+        )
 
-        if (compatibilityScore >= 80) {
+        if (compatibilityScore < 50) return null
+
+        let badge_label = 'Possible'
+        let badge_tone: 'green' | 'yellow' | 'red' = 'red'
+
+        if (compatibilityScore >= 85) {
           badge_label = 'Très compatible'
           badge_tone = 'green'
-        } else if (compatibilityScore < 60) {
-          badge_label = 'À vérifier'
-          badge_tone = 'red'
+        } else if (compatibilityScore >= 70) {
+          badge_label = 'Compatible'
+          badge_tone = 'yellow'
         }
 
         return {
@@ -437,7 +656,8 @@ export default async function handler(
           target_parent_last_name: family.parent_last_name,
           target_email: family.email,
           compatibility_score: compatibilityScore,
-          trip_compatibility_score: tripCompatibilityScore,
+          trip_compatibility_score: averageTripScoreWithoutHistory,
+          history_score: historyInfo.history_score,
           history_score_normalized: historyInfo.history_score_normalized,
           coverage_ratio: coverageRatio,
           average_time_fit_score: averageTimeFitScore,
@@ -446,6 +666,8 @@ export default async function handler(
           history_request_id: history?.id ?? null,
           history_created_at: history?.created_at ?? null,
           history_contact_email: family.email,
+          can_contact: historyInfo.can_contact,
+          contact_block_reason: historyInfo.contact_block_reason,
           badge_label,
           badge_tone,
           matched_trip_count: tripMatches.length,
@@ -454,8 +676,9 @@ export default async function handler(
           trip_matches: tripMatches,
         }
       })
-      .filter(Boolean)
-      .sort((a: any, b: any) => b.compatibility_score - a.compatibility_score)
+
+      .filter((item): item is NonNullable<typeof item> => item !== null)
+      .sort((a, b) => b.compatibility_score - a.compatibility_score)
 
     return res.status(200).json({ results })
   } catch (error) {

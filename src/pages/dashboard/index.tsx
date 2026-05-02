@@ -114,10 +114,6 @@ export default function DashboardHomePage() {
                 <Link href="/dashboard/requests" className={styles.quickLinkCard}>
                   <h3 className={styles.quickLinkTitle}>Demandes</h3>
                 </Link>
-
-                <Link href="/dashboard/places" className={styles.quickLinkCard}>
-                  <h3 className={styles.quickLinkTitle}>Lieux</h3>
-                </Link>
               </div>
             </div>
           </div>

@@ -26,6 +26,8 @@ export type Place = {
   city: string
   exact_address: string | null
   postal_code: string | null
+  lat: number | null
+  lng: number | null
   is_active: boolean
   created_at: string
 }
@@ -52,14 +54,32 @@ export type TripStatus =
   | 'resolved'
   | 'archived'
 
+
+  
+export type TripLocationType = 'place' | 'private_address'
+
 export type Trip = {
   id: string
   family_id: string
   child_id: string
+
+  from_location_type: TripLocationType
+  to_location_type: TripLocationType
+
   from_place_id: string | null
   to_place_id: string | null
+
+  from_address: string | null
+  to_address: string | null
+
+  from_lat: number | null
+  from_lng: number | null
+  to_lat: number | null
+  to_lng: number | null
+
   from_place_suggestion_id: string | null
   to_place_suggestion_id: string | null
+
   day_of_week: number
   from_time: string
   to_time: string | null
@@ -151,6 +171,17 @@ export type FamilyTripMatch = {
   time_diff_min: number
   allowed_diff_min: number
   time_fit_score: number
+
+  from_distance_m: number
+  to_distance_m: number
+  from_distance_label: string
+  to_distance_label: string
+  from_distance_score: number
+  to_distance_score: number
+  time_score: number
+  history_score: number
+  compatibility_score: number
+
 }
 
 export type FamilyMatch = {
@@ -180,6 +211,11 @@ export type FamilyMatch = {
   matched_requester_trip_count: number
   covered_day_of_week_values: number[]
   trip_matches: FamilyTripMatch[]
+
+  history_score: number
+  can_contact: boolean
+  contact_block_reason: string | null
+
 }
 
 export const DAY_OPTIONS = [
@@ -255,10 +291,10 @@ export function formatTripStatus(status: Trip['status']) {
 export function isTripReadyForMatching(trip: Trip): boolean {
   return (
     trip.status === 'searching' &&
-    !!trip.from_place_id &&
-    !!trip.to_place_id &&
-    !trip.from_place_suggestion_id &&
-    !trip.to_place_suggestion_id
+    trip.from_lat !== null &&
+    trip.from_lng !== null &&
+    trip.to_lat !== null &&
+    trip.to_lng !== null
   )
 }
 
@@ -275,23 +311,13 @@ export function getTripBlockingReason(trip: Trip): string | null {
     }
   }
 
-  const fromPending = !!trip.from_place_suggestion_id
-  const toPending = !!trip.to_place_suggestion_id
-
-  if (fromPending && toPending) {
-    return 'Les lieux de départ et d’arrivée sont en attente de validation.'
-  }
-
-  if (fromPending) {
-    return 'Le lieu de départ est en attente de validation.'
-  }
-
-  if (toPending) {
-    return 'Le lieu d’arrivée est en attente de validation.'
-  }
-
-  if (!trip.from_place_id || !trip.to_place_id) {
-    return 'Le trajet est incomplet.'
+  if (
+    trip.from_lat === null ||
+    trip.from_lng === null ||
+    trip.to_lat === null ||
+    trip.to_lng === null
+  ) {
+    return 'Le trajet est incomplet : les coordonnées du départ ou de la destination sont manquantes.'
   }
 
   return null
@@ -363,8 +389,16 @@ export async function loadTrips(familyId: string) {
       id,
       family_id,
       child_id,
+      from_location_type,
+      to_location_type,
       from_place_id,
       to_place_id,
+      from_address,
+      to_address,
+      from_lat,
+      from_lng,
+      to_lat,
+      to_lng,
       from_place_suggestion_id,
       to_place_suggestion_id,
       day_of_week,
@@ -376,6 +410,7 @@ export async function loadTrips(familyId: string) {
       created_at,
       trip_group_id
     `)
+
     .eq('family_id', familyId)
     .order('created_at', { ascending: false })
     .order('day_of_week', { ascending: true })

@@ -86,8 +86,7 @@ export default function QuiSommesNousPage() {
                 retours des familles utilisatrices.
               </p>
               <p style={{ marginTop: 12 }}>
-                Vous pouvez proposer une amélioration, signaler un problème ou suggérer l’ajout
-                d’un lieu utile à Bourg-la-Reine.
+                Vous pouvez proposer une amélioration ou signaler un problème en contactant l'admin du site.
               </p>
             </div>
 

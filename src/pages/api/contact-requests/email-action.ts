@@ -155,7 +155,25 @@ export default async function handler(
         console.error('Failed to send acceptance email:', emailError)
       }
 
-      return res.send('Demande acceptée. Vous pouvez fermer cette page.')
+
+      res.setHeader('Content-Type', 'text/html; charset=utf-8')
+
+      return res.status(200).send(`
+      <!doctype html>
+      <html lang="fr">
+        <head>
+          <meta charset="utf-8" />
+          <title>Demande acceptée</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; padding: 24px;">
+          <h1>Demande acceptée</h1>
+          <p>Vous pouvez fermer cette page.</p>
+        </body>
+      </html>
+      `)
+
+
+
     }
 
     const { error: updateError } = await supabaseAdmin
@@ -202,7 +220,23 @@ export default async function handler(
       console.error('Failed to send decline email:', emailError)
     }
 
-    return res.send('Demande refusée. Vous pouvez fermer cette page.')
+    res.setHeader('Content-Type', 'text/html; charset=utf-8')
+
+    return res.status(200).send(`
+    <!doctype html>
+    <html lang="fr">
+      <head>
+        <meta charset="utf-8" />
+        <title>Demande refusée</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; padding: 24px;">
+        <h1>Demande refusée</h1>
+        <p>Vous pouvez fermer cette page.</p>
+      </body>
+    </html>
+    `)
+
+
   } catch (error) {
     return res.status(400).send(
       error instanceof Error ? error.message : 'Lien invalide.'

@@ -5,12 +5,14 @@ import { useRouter } from 'next/router'
 import styles from '../../styles/Dashboard.module.css'
 import {
   Child,
+  Place,
   Trip,
   TripStatus,
   formatSingleDay,
   formatTimeValue,
   formatTripStatus,
   loadChildren,
+  loadPlaces,
   loadTrips,
   requireFamily,
 } from '../../lib/dashboardShared'
@@ -21,13 +23,69 @@ type Props = {
   setGlobalPopup?: SetGlobalPopup
 }
 
-type SearchPlaceResult = {
+type SearchLocationResult = {
   id: string
   name: string
   city: string
-  source: 'place' | 'suggestion'
-  provisional?: boolean
+  kind: 'school' | 'activity' | 'other' | 'address'
+  source: 'place' | 'address'
+  label: string
+  address: string | null
+  lat: number
+  lng: number
+  score?: number | null
 }
+
+type TripValidationErrors = {
+  child: boolean
+  from: boolean
+  to: boolean
+  days: boolean
+  time: boolean
+}
+
+const emptyTripValidationErrors: TripValidationErrors = {
+  child: false,
+  from: false,
+  to: false,
+  days: false,
+  time: false,
+}
+
+function MissingFieldInfo({ message }: { message: string }) {
+  return (
+    <span
+      title={message}
+      aria-label={message}
+      role="img"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 20,
+        height: 20,
+        marginLeft: 8,
+        borderRadius: '999px',
+        color: '#b91c1c',
+        background: '#fee2e2',
+        border: '1px solid #fecaca',
+        fontSize: 13,
+        fontWeight: 800,
+        lineHeight: 1,
+        cursor: 'help',
+        verticalAlign: 'middle',
+      }}
+    >
+      !
+    </span>
+  )
+}
+
+const CHILD_MISSING_MESSAGE = 'Choisissez un enfant.'
+const LOCATION_MISSING_MESSAGE =
+  'Saisissez un lieu connu ou une adresse complète, puis choisissez une proposition dans la liste.'
+const DAY_MISSING_MESSAGE = 'Choisissez au moins un jour.'
+const TIME_MISSING_MESSAGE = 'Saisissez un horaire.'
 
 const STATUS_OPTIONS: { value: TripStatus; label: string }[] = [
   {
@@ -73,12 +131,56 @@ function groupTripsByTripGroup(trips: Trip[]) {
   }))
 }
 
+function formatPlaceLabel(place: Place | undefined | null) {
+  if (!place) return 'Lieu non renseigné'
+  return `${place.name} (${place.city})`
+}
+
+function formatTripLocation(
+  trip: Trip | undefined | null,
+  direction: 'from' | 'to',
+  placeMap: Record<string, Place>
+) {
+  if (!trip) return 'Lieu non renseigné'
+
+  const locationType = direction === 'from' ? trip.from_location_type : trip.to_location_type
+  const address = direction === 'from' ? trip.from_address : trip.to_address
+  const placeId = direction === 'from' ? trip.from_place_id : trip.to_place_id
+
+  if (locationType === 'private_address') {
+    return address || 'Adresse non renseignée'
+  }
+
+  if (placeId) {
+    return formatPlaceLabel(placeMap[placeId])
+  }
+
+  return 'Lieu non renseigné'
+}
+
+function isSameSelectedLocation(
+  fromLocation: SearchLocationResult,
+  toLocation: SearchLocationResult
+) {
+  if (fromLocation.source !== toLocation.source) return false
+
+  if (fromLocation.source === 'place') {
+    return fromLocation.id === toLocation.id
+  }
+
+  return (
+    fromLocation.address === toLocation.address ||
+    (fromLocation.lat === toLocation.lat && fromLocation.lng === toLocation.lng)
+  )
+}
+
 export default function DashboardTripsPage({ setGlobalPopup }: Props) {
   const router = useRouter()
   const fromFindMatch = router.query.from === 'find-match'
 
   const [familyId, setFamilyId] = useState('')
   const [children, setChildren] = useState<Child[]>([])
+  const [places, setPlaces] = useState<Place[]>([])
   const [trips, setTrips] = useState<Trip[]>([])
 
   const [loading, setLoading] = useState(true)
@@ -87,20 +189,18 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
   const [deletingTripGroupId, setDeletingTripGroupId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
-  const [showNewPlaceConfirm, setShowNewPlaceConfirm] = useState(false)
 
   const [childId, setChildId] = useState('')
   const [fromPlaceQuery, setFromPlaceQuery] = useState('')
   const [toPlaceQuery, setToPlaceQuery] = useState('')
-  const [fromPlaceId, setFromPlaceId] = useState('')
-  const [toPlaceId, setToPlaceId] = useState('')
-  const [fromPlaceSource, setFromPlaceSource] = useState<'place' | 'suggestion' | ''>('')
-  const [toPlaceSource, setToPlaceSource] = useState<'place' | 'suggestion' | ''>('')
-  const [fromResults, setFromResults] = useState<SearchPlaceResult[]>([])
-  const [toResults, setToResults] = useState<SearchPlaceResult[]>([])
+  const [fromLocation, setFromLocation] = useState<SearchLocationResult | null>(null)
+  const [toLocation, setToLocation] = useState<SearchLocationResult | null>(null)
+  const [fromResults, setFromResults] = useState<SearchLocationResult[]>([])
+  const [toResults, setToResults] = useState<SearchLocationResult[]>([])
   const [selectedDays, setSelectedDays] = useState<number[]>([])
   const [fromTime, setFromTime] = useState('')
-  const [toleranceMin, setToleranceMin] = useState('10')
+  const [tripValidationErrors, setTripValidationErrors] =
+    useState<TripValidationErrors>(emptyTripValidationErrors)
 
   const [editingTripGroupId, setEditingTripGroupId] = useState<string | null>(null)
   const [editingStatus, setEditingStatus] = useState<TripStatus>('searching')
@@ -121,13 +221,15 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
 
         setFamilyId(family.id)
 
-        const [childrenData, tripsData] = await Promise.all([
+        const [childrenData, tripsData, placesData] = await Promise.all([
           loadChildren(family.id),
           loadTrips(family.id),
+          loadPlaces(),
         ])
 
         setChildren(childrenData)
         setTrips(tripsData)
+        setPlaces(placesData)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erreur de chargement.')
       } finally {
@@ -141,6 +243,11 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
   const childMap = useMemo(
     () => Object.fromEntries(children.map((child) => [child.id, child])),
     [children]
+  )
+
+  const placeMap = useMemo(
+    () => Object.fromEntries(places.map((place) => [place.id, place])),
+    [places]
   )
 
   const groupedTrips = useMemo(() => groupTripsByTripGroup(trips), [trips])
@@ -170,13 +277,29 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
 
     if (!response.ok) return
 
-    const results = payload?.results ?? []
+    const results = (payload?.results ?? []) as SearchLocationResult[]
 
     if (target === 'from') setFromResults(results)
     else setToResults(results)
   }
 
+  function selectLocation(item: SearchLocationResult, target: 'from' | 'to') {
+    if (target === 'from') {
+      setFromLocation(item)
+      setFromPlaceQuery(item.label)
+      setFromResults([])
+      setTripValidationErrors((prev) => ({ ...prev, from: false }))
+      return
+    }
+
+    setToLocation(item)
+    setToPlaceQuery(item.label)
+    setToResults([])
+    setTripValidationErrors((prev) => ({ ...prev, to: false }))
+  }
+
   function toggleDay(dayValue: number) {
+    setTripValidationErrors((prev) => ({ ...prev, days: false }))
     setSelectedDays((prev) =>
       prev.includes(dayValue)
         ? prev.filter((value) => value !== dayValue)
@@ -188,15 +311,13 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
     setChildId('')
     setFromPlaceQuery('')
     setToPlaceQuery('')
-    setFromPlaceId('')
-    setToPlaceId('')
-    setFromPlaceSource('')
-    setToPlaceSource('')
+    setFromLocation(null)
+    setToLocation(null)
     setFromResults([])
     setToResults([])
     setSelectedDays([])
     setFromTime('')
-    setToleranceMin('10')
+    setTripValidationErrors(emptyTripValidationErrors)
   }
 
   async function handleAddTrip(e: FormEvent) {
@@ -208,30 +329,35 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
       return
     }
 
-    if (!childId) {
-      showPopup('Veuillez sélectionner un enfant.', 'error')
+    const validationErrors: TripValidationErrors = {
+      child: !childId,
+      from: !fromLocation,
+      to: !toLocation,
+      days: selectedDays.length === 0,
+      time: !fromTime,
+    }
+
+    setTripValidationErrors(validationErrors)
+
+    if (Object.values(validationErrors).some(Boolean)) {
+      showPopup('Complétez les informations manquantes.', 'error')
       return
     }
 
-    if (!fromPlaceId || !toPlaceId) {
-      showPopup('Veuillez sélectionner un départ et une arrivée dans la liste proposée.', 'error')
+    if (!fromLocation || !toLocation) {
+      showPopup('Complétez les informations manquantes.', 'error')
       return
     }
 
-    if (fromPlaceId === toPlaceId && fromPlaceSource === 'place' && toPlaceSource === 'place') {
-      showPopup('Le départ et l’arrivée doivent être différents.', 'error')
+    if (isSameSelectedLocation(fromLocation, toLocation)) {
+      showPopup('Le départ et la destination doivent être différents.', 'error')
       return
     }
 
-    if (!fromTime) {
-      showPopup('Veuillez renseigner l’horaire.', 'error')
-      return
-    }
 
-    if (selectedDays.length === 0) {
-      showPopup('Veuillez sélectionner au moins un jour.', 'error')
-      return
-    }
+
+
+
 
     setSaving(true)
 
@@ -240,14 +366,22 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
     const rows = selectedDays.map((day) => ({
       family_id: familyId,
       child_id: childId,
-      from_place_id: fromPlaceSource === 'place' ? fromPlaceId : null,
-      to_place_id: toPlaceSource === 'place' ? toPlaceId : null,
-      from_place_suggestion_id: fromPlaceSource === 'suggestion' ? fromPlaceId : null,
-      to_place_suggestion_id: toPlaceSource === 'suggestion' ? toPlaceId : null,
+      from_location_type: fromLocation.source === 'address' ? 'private_address' : 'place',
+      to_location_type: toLocation.source === 'address' ? 'private_address' : 'place',
+      from_place_id: fromLocation.source === 'place' ? fromLocation.id : null,
+      to_place_id: toLocation.source === 'place' ? toLocation.id : null,
+      from_address: fromLocation.source === 'address' ? fromLocation.address || fromLocation.label : null,
+      to_address: toLocation.source === 'address' ? toLocation.address || toLocation.label : null,
+      from_lat: fromLocation.lat,
+      from_lng: fromLocation.lng,
+      to_lat: toLocation.lat,
+      to_lng: toLocation.lng,
+      from_place_suggestion_id: null,
+      to_place_suggestion_id: null,
       day_of_week: day,
       from_time: fromTime,
       to_time: null,
-      tolerance_min: Number(toleranceMin) || 10,
+      tolerance_min: 10,
       status: 'searching',
       trip_group_id: tripGroupId,
     }))
@@ -312,11 +446,6 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
     setEditingStatus(group.items[0]?.status || 'searching')
   }
 
-  function goToPlacesPage() {
-    setShowNewPlaceConfirm(false)
-    router.push('/dashboard/places')
-  }
-
   function TripGroupList({
     title,
     groups,
@@ -345,9 +474,6 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
                   <div className={styles.itemHeader}>
                     <div>
                       <h3 className={styles.itemTitle}>{child?.first_name || 'Enfant'}</h3>
-                      <p className={styles.itemMeta}>
-                        <strong>Départ</strong> et <strong>Arrivée</strong> définis pour ce trajet
-                      </p>
                     </div>
 
                     <span className={styles.badgeBlue}>
@@ -362,6 +488,12 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
                     </p>
                     <p>
                       <strong>Horaire</strong> : {formatTimeValue(firstTrip?.from_time ?? null)}
+                    </p>
+                    <p>
+                      <strong>Départ</strong> : {formatTripLocation(firstTrip, 'from', placeMap)}
+                    </p>
+                    <p>
+                      <strong>Destination</strong> : {formatTripLocation(firstTrip, 'to', placeMap)}
                     </p>
                   </div>
 
@@ -476,7 +608,10 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
                 <button
                   type="button"
                   className={styles.primaryButton}
-                  onClick={() => setShowAddForm((prev) => !prev)}
+                  onClick={() => {
+                    setShowAddForm((prev) => !prev)
+                    setTripValidationErrors(emptyTripValidationErrors)
+                  }}
                 >
                   {showAddForm ? 'Fermer' : 'Créer un trajet'}
                 </button>
@@ -486,13 +621,22 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
                 <div style={{ marginTop: 20 }}>
                   <form onSubmit={handleAddTrip} className={styles.form}>
                     <div className={styles.field}>
-                      <label htmlFor="childId">Enfant</label>
+                      <label htmlFor="childId">
+                        Enfant
+                        {tripValidationErrors.child ? (
+                          <MissingFieldInfo message={CHILD_MISSING_MESSAGE} />
+                        ) : null}
+                      </label>
                       <select
                         id="childId"
                         className={styles.select}
                         value={childId}
-                        onChange={(e) => setChildId(e.target.value)}
-                        required
+                        onChange={(e) => {
+                          setChildId(e.target.value)
+                          if (e.target.value) {
+                            setTripValidationErrors((prev) => ({ ...prev, child: false }))
+                          }
+                        }}
                       >
                         <option value="">Sélectionner</option>
                         {children.map((child) => (
@@ -505,7 +649,12 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
                     </div>
 
                     <div className={styles.field}>
-                      <label>Jours</label>
+                      <label>
+                        Jours
+                        {tripValidationErrors.days ? (
+                          <MissingFieldInfo message={DAY_MISSING_MESSAGE} />
+                        ) : null}
+                      </label>
                       <div className={styles.itemActions}>
                         {DAY_OPTIONS.map((day) => (
                           <button
@@ -525,18 +674,22 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
                     </div>
 
                     <div className={styles.field}>
-                      <label htmlFor="fromPlaceQuery">Départ</label>
+                      <label htmlFor="fromPlaceQuery">
+                        Départ
+                        {tripValidationErrors.from ? (
+                          <MissingFieldInfo message={LOCATION_MISSING_MESSAGE} />
+                        ) : null}
+                      </label>
                       <input
                         id="fromPlaceQuery"
                         className={styles.input}
                         value={fromPlaceQuery}
                         onChange={(e) => {
                           setFromPlaceQuery(e.target.value)
-                          setFromPlaceId('')
-                          setFromPlaceSource('')
+                          setFromLocation(null)
                           void searchPlaces(e.target.value, 'from')
                         }}
-                        placeholder="Commencez à saisir un lieu"
+                        placeholder="Lieu connu ou adresse complète"
                       />
                       {fromResults.length > 0 ? (
                         <div className={styles.searchResultsList}>
@@ -545,47 +698,35 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
                               key={item.id}
                               type="button"
                               className={styles.searchResultButton}
-                              onClick={() => {
-                                setFromPlaceId(item.id)
-                                setFromPlaceSource(item.source)
-                                setFromPlaceQuery(
-                                  `${item.name} (${item.city})${
-                                    item.provisional ? ' — provisoire' : ''
-                                  }`
-                                )
-                                setFromResults([])
-                              }}
+                              onClick={() => selectLocation(item, 'from')}
                             >
                               <span>
-                                {item.name} ({item.city})
-                                {item.provisional ? ' — provisoire' : ''}
+                                {item.label}
+                                {item.source === 'address' ? ' — adresse' : ' — lieu enregistré'}
                               </span>
                             </button>
                           ))}
-                          <button
-                            type="button"
-                            className={styles.searchResultButtonAlt}
-                            onClick={() => setShowNewPlaceConfirm(true)}
-                          >
-                            Ajouter un nouveau lieu
-                          </button>
                         </div>
                       ) : null}
                     </div>
 
                     <div className={styles.field}>
-                      <label htmlFor="toPlaceQuery">Arrivée</label>
+                      <label htmlFor="toPlaceQuery">
+                        Destination
+                        {tripValidationErrors.to ? (
+                          <MissingFieldInfo message={LOCATION_MISSING_MESSAGE} />
+                        ) : null}
+                      </label>
                       <input
                         id="toPlaceQuery"
                         className={styles.input}
                         value={toPlaceQuery}
                         onChange={(e) => {
                           setToPlaceQuery(e.target.value)
-                          setToPlaceId('')
-                          setToPlaceSource('')
+                          setToLocation(null)
                           void searchPlaces(e.target.value, 'to')
                         }}
-                        placeholder="Commencez à saisir un lieu"
+                        placeholder="Lieu connu ou adresse complète"
                       />
                       {toResults.length > 0 ? (
                         <div className={styles.searchResultsList}>
@@ -594,59 +735,37 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
                               key={item.id}
                               type="button"
                               className={styles.searchResultButton}
-                              onClick={() => {
-                                setToPlaceId(item.id)
-                                setToPlaceSource(item.source)
-                                setToPlaceQuery(
-                                  `${item.name} (${item.city})${
-                                    item.provisional ? ' — provisoire' : ''
-                                  }`
-                                )
-                                setToResults([])
-                              }}
+                              onClick={() => selectLocation(item, 'to')}
                             >
                               <span>
-                                {item.name} ({item.city})
-                                {item.provisional ? ' — provisoire' : ''}
+                                {item.label}
+                                {item.source === 'address' ? ' — adresse' : ' — lieu enregistré'}
                               </span>
                             </button>
                           ))}
-                          <button
-                            type="button"
-                            className={styles.searchResultButtonAlt}
-                            onClick={() => setShowNewPlaceConfirm(true)}
-                          >
-                            Ajouter un nouveau lieu
-                          </button>
                         </div>
                       ) : null}
                     </div>
 
-                    <div className={styles.fieldRow}>
-                      <div className={styles.field}>
-                        <label htmlFor="fromTime">Horaire</label>
-                        <input
-                          id="fromTime"
-                          type="time"
-                          className={styles.timeInput}
-                          value={fromTime}
-                          onChange={(e) => setFromTime(e.target.value)}
-                          required
-                        />
-                      </div>
-
-                      <div className={styles.field}>
-                        <label htmlFor="toleranceMin">Tolérance (minutes)</label>
-                        <input
-                          id="toleranceMin"
-                          type="number"
-                          className={styles.input}
-                          min={0}
-                          max={180}
-                          value={toleranceMin}
-                          onChange={(e) => setToleranceMin(e.target.value)}
-                        />
-                      </div>
+                    <div className={styles.field}>
+                      <label htmlFor="fromTime">
+                        Horaire
+                        {tripValidationErrors.time ? (
+                          <MissingFieldInfo message={TIME_MISSING_MESSAGE} />
+                        ) : null}
+                      </label>
+                      <input
+                        id="fromTime"
+                        type="time"
+                        className={styles.timeInput}
+                        value={fromTime}
+                        onChange={(e) => {
+                          setFromTime(e.target.value)
+                          if (e.target.value) {
+                            setTripValidationErrors((prev) => ({ ...prev, time: false }))
+                          }
+                        }}
+                      />
                     </div>
 
                     <div className={styles.itemActions}>
@@ -685,41 +804,6 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
             </div>
           </div>
         </section>
-
-        {showNewPlaceConfirm ? (
-          <div className={styles.modalOverlay}>
-            <div className={styles.modalSmallCard}>
-              <p className={styles.modalText}>
-                Il est préférable de sélectionner un lieu préenregistré.
-                <br />
-                <br />
-                Vous pouvez demander l’ajout d’un nouveau lieu, mais il devra être validé par
-                l’administrateur avant toute recherche de trajet compatible.
-                <br />
-                <br />
-                Vous voulez quand-même en ajouter un ? Si oui, faites-le, puis revenez ici pour
-                compléter vos trajets.
-              </p>
-
-              <div className={styles.itemActions}>
-                <button
-                  type="button"
-                  className={styles.secondaryButton}
-                  onClick={() => setShowNewPlaceConfirm(false)}
-                >
-                  Annuler
-                </button>
-                <button
-                  type="button"
-                  className={styles.primaryButton}
-                  onClick={goToPlacesPage}
-                >
-                  OK
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : null}
       </main>
     </>
   )
