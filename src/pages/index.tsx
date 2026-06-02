@@ -74,7 +74,7 @@ export default function HomePage() {
                 </div>
 
                 <h1 className={styles.heroTitle}>
-                  Organisez plus facilement les trajets de vos enfants à Bourg-la-Reine
+                  Organisez plus facilement les trajets de vos enfants
                 </h1>
 
                 <p className={styles.heroText}>
