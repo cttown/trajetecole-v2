@@ -79,7 +79,8 @@ export default function HomePage() {
 
                 <p className={styles.heroText}>
                   Beaucoup de parents font les mêmes trajets sans le savoir. TrajetÉcole aide les
-                  familles à trouver des trajets compatibles entre votre domicile, l’école et les activités.
+                  familles à trouver des trajets compatibles entre votre domicile, l’école et les
+                  activités.
                 </p>
 
                 <div className={styles.heroBenefits}>
@@ -204,29 +205,6 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className={styles.featuresSection}>
-          <div className={styles.container}>
-            <h2 className={styles.sectionTitle}>Pourquoi s’inscrire ?</h2>
-
-            <div className={styles.privacyBox}>
-              <p className={styles.privacyText}>
-                Chaque famille inscrite augmente les chances de trouver des trajets compatibles.
-              </p>
-
-              {isAuthChecked && isLoggedIn ? (
-                <Link href="/dashboard" className={styles.primaryButton}>
-                  Accéder à mon espace
-                </Link>
-              ) : (
-                <Link href="/signup" className={styles.primaryButton}>
-                  Créer mon compte
-                </Link>
-              )}
-            </div>
-          </div>
-        </section>
-
-
         <section className={styles.privacySection}>
           <div className={styles.container}>
             <h2 className={styles.sectionTitle}>Confidentialité</h2>
@@ -259,17 +237,17 @@ export default function HomePage() {
           </div>
         </section>
 
-
-
-
-
-
         <section className={styles.quickLinksSection}>
           <div className={styles.container}>
             <div className={styles.quickLinksGrid}>
               <Link href="/qui-sommes-nous" className={styles.quickLinkCard}>
                 <div className={styles.quickLinkIcon}>🏡</div>
                 <span>Qui sommes-nous ?</span>
+              </Link>
+
+              <Link href="/ressources" className={styles.quickLinkCard}>
+                <div className={styles.quickLinkIcon}>📚</div>
+                <span>Ressources</span>
               </Link>
 
               <Link href="/contact-admin" className={styles.quickLinkCard}>
