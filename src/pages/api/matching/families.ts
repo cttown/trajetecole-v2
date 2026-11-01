@@ -654,7 +654,8 @@ export default async function handler(
           target_family_id: family.id,
           target_parent_first_name: family.parent_first_name,
           target_parent_last_name: family.parent_last_name,
-          target_email: family.email,
+          // Email volontairement NON exposé ici : la mise en relation
+          // (et donc le partage de l'email) n'a lieu qu'après acceptation.
           compatibility_score: compatibilityScore,
           trip_compatibility_score: averageTripScoreWithoutHistory,
           history_score: historyInfo.history_score,
@@ -665,7 +666,6 @@ export default async function handler(
           history_label: historyInfo.history_label,
           history_request_id: history?.id ?? null,
           history_created_at: history?.created_at ?? null,
-          history_contact_email: family.email,
           can_contact: historyInfo.can_contact,
           contact_block_reason: historyInfo.contact_block_reason,
           badge_label,
