@@ -45,7 +45,7 @@ export default function ForgotPasswordPage({ setGlobalPopup }: Props) {
     }
 
     showPopup(
-      'Un email de réinitialisation vient d’être envoyé. Pensez à vérifier aussi vos emails indésirables.',
+      'Si cette adresse correspond à un compte TrajetEcole, un email de réinitialisation vient d’être envoyé. Pensez à vérifier aussi vos emails indésirables.',
       'success'
     )
   }
