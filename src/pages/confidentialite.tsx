@@ -1,4 +1,4 @@
-import Head from 'next/head'
+import Seo from '../components/Seo'
 import Link from 'next/link'
 import styles from '../styles/Home.module.css'
 
@@ -53,13 +53,11 @@ function VisualList({ items }: { items: string[] }) {
 export default function ConfidentialitePage() {
   return (
     <>
-      <Head>
-        <title>Confidentialité - TrajetÉcole</title>
-        <meta
-          name="description"
-          content="Comment TrajetÉcole utilise les données nécessaires au fonctionnement du service et protège les coordonnées des familles."
-        />
-      </Head>
+      <Seo
+        title="Confidentialité - TrajetEcole"
+        description="Comment TrajetEcole utilise les données nécessaires au fonctionnement du service et protège les coordonnées des familles."
+        path="/confidentialite"
+      />
 
       <main className={styles.page}>
         <section className={styles.legalSection}>
@@ -70,7 +68,7 @@ export default function ConfidentialitePage() {
               <h1 className={styles.legalTitle}>Confidentialité</h1>
 
               <p className={styles.legalIntro}>
-                TrajetÉcole utilise uniquement les informations nécessaires au fonctionnement du
+                TrajetEcole utilise uniquement les informations nécessaires au fonctionnement du
                 service : créer votre compte, enregistrer vos trajets, rechercher des familles
                 compatibles et gérer les demandes de mise en relation.
               </p>
@@ -104,7 +102,7 @@ export default function ConfidentialitePage() {
               <h2 style={cardTitleStyle}>Quelles données sont utilisées ?</h2>
 
               <p>
-                TrajetÉcole peut utiliser uniquement les informations utiles au service :
+                TrajetEcole peut utiliser uniquement les informations utiles au service :
               </p>
 
               <VisualList
@@ -123,7 +121,7 @@ export default function ConfidentialitePage() {
               <h2 style={cardTitleStyle}>Pourquoi ces données ?</h2>
 
               <p>
-                Ces informations servent uniquement à faire fonctionner TrajetÉcole :
+                Ces informations servent uniquement à faire fonctionner TrajetEcole :
               </p>
 
               <VisualList

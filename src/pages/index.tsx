@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import Head from 'next/head'
+import Seo from '../components/Seo'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { supabase } from '../lib/supabaseClient'
@@ -56,13 +56,11 @@ export default function HomePage() {
 
   return (
     <>
-      <Head>
-        <title>TrajetÉcole - Trajets des enfants à Bourg-la-Reine</title>
-        <meta
-          name="description"
-          content="TrajetÉcole aide les familles à trouver des trajets compatibles vers l’école, les activités, le conservatoire ou le sport."
-        />
-      </Head>
+      <Seo
+        title="TrajetEcole – Organiser les trajets à pied des enfants entre familles"
+        description="TrajetEcole aide les familles à trouver des trajets compatibles à pied vers l’école, les activités, le conservatoire ou le sport."
+        path=""
+      />
 
       <main className={styles.page}>
         <section className={styles.hero}>
@@ -70,7 +68,7 @@ export default function HomePage() {
             <div className={styles.heroGrid}>
               <div>
                 <div className={styles.badge}>
-                  Local · Gratuit · Données privées · Contact uniquement après accord
+                  Entraide entre parents · Gratuit · Données privées · Contact uniquement après accord
                 </div>
 
                 <h1 className={styles.heroTitle}>
@@ -78,15 +76,15 @@ export default function HomePage() {
                 </h1>
 
                 <p className={styles.heroText}>
-                  Beaucoup de parents font les mêmes trajets sans le savoir. TrajetÉcole aide les
+                  Beaucoup de parents font les mêmes trajets sans le savoir. TrajetEcole aide les
                   familles à trouver des trajets compatibles entre votre domicile, l’école et les
                   activités.
                 </p>
 
                 <div className={styles.heroBenefits}>
                   <div className={styles.benefitItem}>
-                    <span className={styles.benefitIcon}>📍</span>
-                    <span>Local</span>
+                    <span className={styles.benefitIcon}>🤝</span>
+                    <span>Entraide entre parents</span>
                   </div>
 
                   <div className={styles.benefitItem}>
@@ -138,7 +136,7 @@ export default function HomePage() {
                   <div className={styles.mockupTopbar}>
                     <div className={styles.mockupBrand}>
                       <span className={styles.mockupLogo}>●</span>
-                      <span>TrajetÉcole</span>
+                      <span>TrajetEcole</span>
                     </div>
 
                     <div className={styles.mockupDots}>

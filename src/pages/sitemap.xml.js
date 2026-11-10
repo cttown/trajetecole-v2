@@ -1,4 +1,4 @@
-const SITE_URL = 'https://www.trajetecole.fr';
+import { SITE_URL } from '../lib/site';
 
 export default function Sitemap() {
   return null;
@@ -10,6 +10,13 @@ export async function getServerSideProps({ res }) {
     { url: '/qui-sommes-nous', priority: '0.7', changefreq: 'monthly' },
     { url: '/confidentialite', priority: '0.3', changefreq: 'yearly' },
     { url: '/contact-admin', priority: '0.3', changefreq: 'yearly' },
+    { url: '/ressources', priority: '0.6', changefreq: 'monthly' },
+    { url: '/ressources/raisons-partager-trajets-enfants-pied', priority: '0.5', changefreq: 'monthly' },
+    { url: '/ressources/organiser-trajets-scolaires-entre-voisins', priority: '0.5', changefreq: 'monthly' },
+    { url: '/ressources/activites-extrascolaires-partager-trajets', priority: '0.5', changefreq: 'monthly' },
+    { url: '/ressources/gagner-temps-matin-entraide-parents', priority: '0.5', changefreq: 'monthly' },
+    { url: '/ressources/regles-trajets-partages-familles', priority: '0.5', changefreq: 'monthly' },
+    { url: '/ressources/confier-enfant-autre-parent', priority: '0.5', changefreq: 'monthly' },
   ];
 
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>

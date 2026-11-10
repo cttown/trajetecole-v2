@@ -1,31 +1,29 @@
-import Head from 'next/head'
+import Seo from '../components/Seo'
 import Link from 'next/link'
 import styles from '../styles/Home.module.css'
 
 export default function QuiSommesNousPage() {
   return (
     <>
-      <Head>
-        <title>Qui sommes-nous ? - TrajetÉcole</title>
-        <meta
-          name="description"
-          content="TrajetÉcole est une initiative locale à Bourg-la-Reine pour faciliter l’entraide entre parents autour des trajets des enfants."
-        />
-      </Head>
+      <Seo
+        title="Qui sommes-nous ? - TrajetEcole"
+        description="TrajetEcole facilite l’entraide entre parents autour des trajets des enfants, partout en France."
+        path="/qui-sommes-nous"
+      />
 
       <main className={styles.page}>
         <section className={styles.legalSection}>
           <div className={styles.container}>
             <div className={styles.legalHeader}>
-              <div className={styles.badge}>🏡 Initiative locale</div>
+              <div className={styles.badge}>🤝 Entraide entre parents</div>
               <h1 className={styles.legalTitle}>Qui sommes-nous ?</h1>
             </div>
 
             <div className={styles.featuresGrid}>
               <div className={styles.featureCard}>
                 <div className={styles.featureIllustration}>🏡</div>
-                <h3>Initiative locale</h3>
-                <p>Créée à Bourg-la-Reine par un parent d’élève.</p>
+                <h3>Par un parent d’élève</h3>
+                <p>Créée par un parent d’élève, ouverte à toutes les familles.</p>
               </div>
 
               <div className={styles.featureCard}>
@@ -44,17 +42,17 @@ export default function QuiSommesNousPage() {
             <div className={styles.legalCard} style={{ marginTop: 24 }}>
               <h2 style={{ fontSize: 28, lineHeight: 1.25 }}>Pourquoi ce site ?</h2>
               <p>
-                À Bourg-la-Reine, beaucoup de familles accompagnent leurs enfants vers les mêmes
+                Partout en France, beaucoup de familles accompagnent leurs enfants vers les mêmes
                 écoles, activités, clubs sportifs ou le conservatoire, souvent aux mêmes horaires.
               </p>
               <p style={{ marginTop: 12 }}>
-                TrajetÉcole est né d’un constat simple : ces trajets existent déjà, mais les
+                TrajetEcole est né d’un constat simple : ces trajets existent déjà, mais les
                 familles ne savent pas toujours qu’elles pourraient s’entraider.
               </p>
             </div>
 
             <div className={styles.legalCard}>
-              <h2 style={{ fontSize: 28, lineHeight: 1.25 }}>Ce que permet TrajetÉcole</h2>
+              <h2 style={{ fontSize: 28, lineHeight: 1.25 }}>Ce que permet TrajetEcole</h2>
               <p>
                 Le site permet aux parents d’indiquer leurs trajets réguliers et de repérer
                 d’autres familles ayant des trajets proches ou compatibles.
@@ -79,10 +77,10 @@ export default function QuiSommesNousPage() {
 
             <div className={styles.legalCard}>
               <h2 style={{ fontSize: 28, lineHeight: 1.25 }}>
-                Un projet local qui évolue
+                Un projet qui évolue
               </h2>
               <p>
-                TrajetÉcole est encore jeune. Le site sera amélioré progressivement grâce aux
+                TrajetEcole est encore jeune. Le site sera amélioré progressivement grâce aux
                 retours des familles utilisatrices.
               </p>
               <p style={{ marginTop: 12 }}>
@@ -93,7 +91,7 @@ export default function QuiSommesNousPage() {
             <div className={styles.legalCard}>
               <h2 style={{ fontSize: 28, lineHeight: 1.25 }}>Une initiative indépendante</h2>
               <p>
-                TrajetÉcole n’est pas un service officiel de la mairie, des écoles ou des
+                TrajetEcole n’est pas un service officiel de la mairie, des écoles ou des
                 associations.
               </p>
               <p style={{ marginTop: 12 }}>

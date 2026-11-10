@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import Head from 'next/head'
+import Seo from '../../components/Seo'
 import Link from 'next/link'
 import styles from '../../styles/Home.module.css'
 
@@ -64,16 +64,12 @@ function VisualList({ items }: { items: string[] }) {
 export default function ActivitesExtrascolairesPartagerTrajetsPage() {
   return (
     <>
-      <Head>
-        <title>
-          Activités extrascolaires : comment partager les trajets avec d&apos;autres familles ? -
-          TrajetÉcole
-        </title>
-        <meta
-          name="description"
-          content="Conseils pratiques pour partager les trajets vers les activités extrascolaires : sport, musique, danse, arts martiaux et entraide entre familles."
-        />
-      </Head>
+      <Seo
+        title="Activités extrascolaires : comment partager les trajets avec d'autres familles ? - TrajetEcole"
+        description="Conseils pratiques pour partager les trajets vers les activités extrascolaires : sport, musique, danse, arts martiaux et entraide entre familles."
+        path="/ressources/activites-extrascolaires-partager-trajets"
+        type="article"
+      />
 
       <main className={styles.page}>
         <section className={styles.legalSection}>
@@ -125,7 +121,7 @@ export default function ActivitesExtrascolairesPartagerTrajetsPage() {
                 items={[
                   'parlez aux autres parents à l’entrée du club ou de l’école de musique : beaucoup sont dans la même situation sans l’avoir jamais évoqué ;',
                   'utilisez les groupes WhatsApp ou Facebook de l’activité pour lancer l’idée ;',
-                  'utilisez TrajetÉcole pour trouver des familles compatibles pour l’école, mais aussi pour les activités extrascolaires.',
+                  'utilisez TrajetEcole pour trouver des familles compatibles pour l’école, mais aussi pour les activités extrascolaires.',
                 ]}
               />
             </div>

@@ -1,4 +1,4 @@
-import Head from 'next/head'
+import Seo from '../../components/Seo'
 import Link from 'next/link'
 import styles from '../../styles/Home.module.css'
 
@@ -63,13 +63,12 @@ function VisualList({ items }: { items: string[] }) {
 export default function OrganiserTrajetsScolairesEntreVoisinsPage() {
   return (
     <>
-      <Head>
-        <title>Comment organiser les trajets scolaires entre voisins ? - TrajetÉcole</title>
-        <meta
-          name="description"
-          content="Conseils pratiques pour organiser les trajets scolaires entre voisins : départ groupé à pied, entraide entre parents, sécurité et organisation simple."
-        />
-      </Head>
+      <Seo
+        title="Comment organiser les trajets scolaires entre voisins ? - TrajetEcole"
+        description="Conseils pratiques pour organiser les trajets scolaires entre voisins : départ groupé à pied, entraide entre parents, sécurité et organisation simple."
+        path="/ressources/organiser-trajets-scolaires-entre-voisins"
+        type="article"
+      />
 
       <main className={styles.page}>
         <section className={styles.legalSection}>
@@ -160,7 +159,7 @@ export default function OrganiserTrajetsScolairesEntreVoisinsPage() {
                 <div className={styles.stepNumber}>3</div>
                 <h3>Les outils en ligne</h3>
                 <p>
-                  Des sites comme TrajetÉcole permettent d’indiquer ses trajets et de trouver
+                  Des sites comme TrajetEcole permettent d’indiquer ses trajets et de trouver
                   d’autres parents compatibles, sans partager ses coordonnées trop tôt.
                 </p>
               </div>

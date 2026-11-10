@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import Head from 'next/head'
+import Seo from '../../components/Seo'
 import Link from 'next/link'
 import styles from '../../styles/Home.module.css'
 
@@ -64,15 +64,12 @@ function VisualList({ items }: { items: string[] }) {
 export default function ReglesTrajetsPartagesFamillesPage() {
   return (
     <>
-      <Head>
-        <title>
-          Trajets partagés entre familles : quelles règles établir dès le début ? - TrajetÉcole
-        </title>
-        <meta
-          name="description"
-          content="Conseils pratiques pour définir des règles simples et claires dès le départ pour organiser des trajets partagés entre familles."
-        />
-      </Head>
+      <Seo
+        title="Trajets partagés entre familles : quelles règles établir dès le début ? - TrajetEcole"
+        description="Conseils pratiques pour définir des règles simples et claires dès le départ pour organiser des trajets partagés entre familles."
+        path="/ressources/regles-trajets-partages-familles"
+        type="article"
+      />
 
       <main className={styles.page}>
         <section className={styles.legalSection}>

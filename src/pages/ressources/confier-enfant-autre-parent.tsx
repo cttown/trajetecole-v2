@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import Head from 'next/head'
+import Seo from '../../components/Seo'
 import Link from 'next/link'
 import styles from '../../styles/Home.module.css'
 
@@ -54,16 +54,12 @@ function VisualList({ items }: { items: string[] }) {
 export default function ConfierEnfantAutreParentPage() {
   return (
     <>
-      <Head>
-        <title>
-          Confier son enfant à un autre parent : comment s&apos;organiser sereinement ? -
-          TrajetÉcole
-        </title>
-        <meta
-          name="description"
-          content="Conseils pratiques pour organiser sereinement un trajet partagé avec un autre parent : confiance, règles, horaires, imprévus et mise en relation."
-        />
-      </Head>
+      <Seo
+        title="Confier son enfant à un autre parent : comment s'organiser sereinement ? - TrajetEcole"
+        description="Conseils pratiques pour organiser sereinement un trajet partagé avec un autre parent : confiance, règles, horaires, imprévus et mise en relation."
+        path="/ressources/confier-enfant-autre-parent"
+        type="article"
+      />
 
       <main className={styles.page}>
         <section className={styles.legalSection}>
@@ -156,7 +152,7 @@ export default function ConfierEnfantAutreParentPage() {
               <h2 style={titleStyle}>Trouver les bonnes familles</h2>
 
               <p>
-                Des plateformes comme TrajetÉcole mettent en relation des familles du même quartier
+                Des plateformes comme TrajetEcole mettent en relation des familles du même quartier
                 avec des trajets compatibles.
               </p>
 

@@ -1,4 +1,4 @@
-import Head from 'next/head'
+import Seo from '../../components/Seo'
 import Link from 'next/link'
 import styles from '../../styles/Home.module.css'
 
@@ -50,13 +50,11 @@ const resources = [
 export default function RessourcesPage() {
   return (
     <>
-      <Head>
-        <title>Ressources - TrajetÉcole</title>
-        <meta
-          name="description"
-          content="Conseils pratiques pour mieux organiser les trajets des enfants : école, activités, conservatoire, sport et entraide entre parents."
-        />
-      </Head>
+      <Seo
+        title="Ressources : organiser les trajets scolaires à pied – TrajetEcole"
+        description="Conseils pratiques pour mieux organiser les trajets des enfants : école, activités, conservatoire, sport et entraide entre parents."
+        path="/ressources"
+      />
 
       <main className={styles.page}>
         <section className={styles.legalSection}>

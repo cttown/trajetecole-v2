@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import Head from 'next/head'
+import Seo from '../../components/Seo'
 import Link from 'next/link'
 import styles from '../../styles/Home.module.css'
 
@@ -26,13 +26,12 @@ const articleImageStyle: CSSProperties = {
 export default function RaisonsPartagerTrajetsEnfantsPiedPage() {
   return (
     <>
-      <Head>
-        <title>5 bonnes raisons de partager les trajets de vos enfants à pied - TrajetÉcole</title>
-        <meta
-          name="description"
-          content="Découvrez 5 bonnes raisons de partager les trajets de vos enfants à pied : gain de temps, sécurité, autonomie, entraide locale et quartier plus apaisé."
-        />
-      </Head>
+      <Seo
+        title="5 bonnes raisons de partager les trajets de vos enfants à pied - TrajetEcole"
+        description="Découvrez 5 bonnes raisons de partager les trajets de vos enfants à pied : gain de temps, sécurité, autonomie, entraide locale et quartier plus apaisé."
+        path="/ressources/raisons-partager-trajets-enfants-pied"
+        type="article"
+      />
 
       <main className={styles.page}>
         <section className={styles.legalSection}>
@@ -127,7 +126,7 @@ export default function RaisonsPartagerTrajetsEnfantsPiedPage() {
               </p>
 
               <p style={paragraphStyle}>
-                Des plateformes comme TrajetÉcole facilitent cette mise en relation : vous indiquez
+                Des plateformes comme TrajetEcole facilitent cette mise en relation : vous indiquez
                 vos trajets, le site trouve les familles proches avec des horaires compatibles, et
                 le contact se fait uniquement avec votre accord.
               </p>

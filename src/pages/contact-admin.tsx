@@ -1,4 +1,4 @@
-import Head from 'next/head'
+import Seo from '../components/Seo'
 import { FormEvent, useMemo, useState } from 'react'
 import Link from 'next/link'
 import styles from '../styles/FormPages.module.css'
@@ -196,13 +196,11 @@ export default function ContactAdminPage() {
 
   return (
     <>
-      <Head>
-        <title>Contacter l’administrateur - TrajetEcole</title>
-        <meta
-          name="description"
-          content="Contactez l’administrateur de TrajetEcole pour poser une question ou signaler un problème."
-        />
-      </Head>
+      <Seo
+        title="Contacter l’administrateur - TrajetEcole"
+        description="Contactez l’administrateur de TrajetEcole pour poser une question ou signaler un problème."
+        path="/contact-admin"
+      />
 
       <main className={styles.page}>
         <section className={styles.section}>

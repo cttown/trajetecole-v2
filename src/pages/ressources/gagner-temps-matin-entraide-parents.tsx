@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import Head from 'next/head'
+import Seo from '../../components/Seo'
 import Link from 'next/link'
 import styles from '../../styles/Home.module.css'
 
@@ -64,15 +64,12 @@ function VisualList({ items }: { items: string[] }) {
 export default function GagnerTempsMatinEntraideParentsPage() {
   return (
     <>
-      <Head>
-        <title>
-          Comment gagner du temps le matin grâce à l&apos;entraide entre parents ? - TrajetÉcole
-        </title>
-        <meta
-          name="description"
-          content="Conseils pratiques pour gagner du temps le matin grâce à l’entraide entre parents voisins et à l’organisation des trajets scolaires."
-        />
-      </Head>
+      <Seo
+        title="Comment gagner du temps le matin grâce à l'entraide entre parents ? - TrajetEcole"
+        description="Conseils pratiques pour gagner du temps le matin grâce à l’entraide entre parents voisins et à l’organisation des trajets scolaires."
+        path="/ressources/gagner-temps-matin-entraide-parents"
+        type="article"
+      />
 
       <main className={styles.page}>
         <section className={styles.legalSection}>
@@ -164,7 +161,7 @@ export default function GagnerTempsMatinEntraideParentsPage() {
                 items={[
                   'parlez-en à la sortie de l’école, car beaucoup de parents sont dans la même situation ;',
                   'utilisez les groupes Facebook ou WhatsApp de classe comme relais ;',
-                  'utilisez TrajetÉcole pour trouver automatiquement des familles avec des trajets et horaires compatibles.',
+                  'utilisez TrajetEcole pour trouver automatiquement des familles avec des trajets et horaires compatibles.',
                 ]}
               />
             </div>
