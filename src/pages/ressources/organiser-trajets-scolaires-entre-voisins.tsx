@@ -1,4 +1,5 @@
 import Seo from '../../components/Seo'
+import Breadcrumb from '../../components/Breadcrumb'
 import Link from 'next/link'
 import styles from '../../styles/Home.module.css'
 
@@ -73,6 +74,14 @@ export default function OrganiserTrajetsScolairesEntreVoisinsPage() {
       <main className={styles.page}>
         <section className={styles.legalSection}>
           <div className={styles.container}>
+            <Breadcrumb
+              items={[
+                { label: 'Accueil', href: '/' },
+                { label: 'Ressources', href: '/ressources' },
+                { label: 'Organiser entre voisins' },
+              ]}
+            />
+
             <div className={styles.legalHeader}>
               <div className={styles.badge}>📚 Ressource pratique</div>
 

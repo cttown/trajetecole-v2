@@ -1,4 +1,5 @@
 import Seo from '../components/Seo'
+import Breadcrumb from '../components/Breadcrumb'
 import Link from 'next/link'
 import styles from '../styles/Home.module.css'
 
@@ -14,6 +15,10 @@ export default function QuiSommesNousPage() {
       <main className={styles.page}>
         <section className={styles.legalSection}>
           <div className={styles.container}>
+            <Breadcrumb
+              items={[{ label: 'Accueil', href: '/' }, { label: 'Qui sommes-nous ?' }]}
+            />
+
             <div className={styles.legalHeader}>
               <div className={styles.badge}>🤝 Entraide entre parents</div>
               <h1 className={styles.legalTitle}>Qui sommes-nous ?</h1>

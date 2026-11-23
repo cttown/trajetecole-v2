@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import Seo from '../../components/Seo'
+import Breadcrumb from '../../components/Breadcrumb'
 import Link from 'next/link'
 import styles from '../../styles/Home.module.css'
 
@@ -64,6 +65,14 @@ export default function ConfierEnfantAutreParentPage() {
       <main className={styles.page}>
         <section className={styles.legalSection}>
           <div className={styles.container}>
+            <Breadcrumb
+              items={[
+                { label: 'Accueil', href: '/' },
+                { label: 'Ressources', href: '/ressources' },
+                { label: 'Confier son enfant' },
+              ]}
+            />
+
             <div className={styles.legalHeader}>
               <div className={styles.badge}>📚 Ressource pratique</div>
 

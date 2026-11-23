@@ -78,7 +78,7 @@ export default function HomePage() {
                 <p className={styles.heroText}>
                   Beaucoup de parents font les mêmes trajets sans le savoir. TrajetEcole aide les
                   familles à trouver des trajets compatibles entre votre domicile, l’école et les
-                  activités.
+                  activités, partout en France métropolitaine.
                 </p>
 
                 <div className={styles.heroBenefits}>
