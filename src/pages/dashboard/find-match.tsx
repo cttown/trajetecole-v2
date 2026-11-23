@@ -496,6 +496,13 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
       return
     }
 
+    trackEvent({
+      eventType: 'trip_created',
+      page: 'dashboard/find-match',
+      path: '/dashboard/find-match',
+      metadata: { count: rows.length },
+    })
+
     await reloadTrips()
     setFromPlaceQuery('')
     setToPlaceQuery('')

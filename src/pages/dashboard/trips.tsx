@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
 import styles from '../../styles/Dashboard.module.css'
+import { trackEvent } from '../../lib/trackEvent'
 import {
   Child,
   Place,
@@ -394,6 +395,13 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
       showPopup(error.message, 'error')
       return
     }
+
+    trackEvent({
+      eventType: 'trip_created',
+      page: 'dashboard/trips',
+      path: '/dashboard/trips',
+      metadata: { count: rows.length },
+    })
 
     await reloadTrips()
     resetForm()
