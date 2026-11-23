@@ -43,12 +43,20 @@ function StatCard({
 
 function SimpleBarChart({
   title,
+  yLabel,
   data,
 }: {
   title: string
+  yLabel: string
   data: DailyPoint[]
 }) {
-  const max = Math.max(...data.map((d) => d.value), 1)
+  // Échelle de l'axe Y en valeurs entières (nombre réel, pas de pourcentage).
+  const rawMax = Math.max(...data.map((d) => d.value), 1)
+  const tickCount = 4
+  const step = Math.max(1, Math.ceil(rawMax / tickCount))
+  const chartMax = step * tickCount
+  const ticks = Array.from({ length: tickCount + 1 }, (_, i) => i * step)
+  const ticksTopDown = [...ticks].reverse()
 
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -57,25 +65,55 @@ function SimpleBarChart({
       {data.length === 0 ? (
         <p className="mt-4 text-sm text-gray-500">Aucune donnée disponible.</p>
       ) : (
-        <>
-          <div className="mt-4">
-            <div className="flex h-56 items-stretch gap-1 overflow-hidden">
-              {data.map((item) => {
-                const height = `${Math.max((item.value / max) * 100, item.value > 0 ? 4 : 0)}%`
+        <div className="mt-4 flex gap-2">
+          {/* Titre de l'axe Y (vertical) */}
+          <div className="flex items-center">
+            <span
+              className="text-xs font-medium text-gray-500"
+              style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+            >
+              {yLabel}
+            </span>
+          </div>
 
-                return (
-                  <div
-                    key={item.day}
-                    className="flex h-full min-w-0 flex-1 flex-col items-center justify-end"
-                    title={`${item.day}: ${item.value}`}
-                  >
+          {/* Graduations de l'axe Y (valeurs réelles) */}
+          <div className="flex h-56 w-8 flex-col justify-between text-right text-xs tabular-nums text-gray-500">
+            {ticksTopDown.map((t) => (
+              <span key={t} className="leading-none">
+                {t}
+              </span>
+            ))}
+          </div>
+
+          {/* Zone du graphe */}
+          <div className="min-w-0 flex-1">
+            <div className="relative h-56">
+              {/* Lignes de repère horizontales */}
+              <div className="absolute inset-0 flex flex-col justify-between">
+                {ticksTopDown.map((t) => (
+                  <div key={t} className="border-t border-gray-100" />
+                ))}
+              </div>
+
+              {/* Barres */}
+              <div className="relative flex h-full items-stretch gap-1">
+                {data.map((item) => {
+                  const height = `${Math.max((item.value / chartMax) * 100, item.value > 0 ? 2 : 0)}%`
+
+                  return (
                     <div
-                      className="w-full rounded-t bg-gray-800"
-                      style={{ height }}
-                    />
-                  </div>
-                )
-              })}
+                      key={item.day}
+                      className="flex h-full min-w-0 flex-1 flex-col items-center justify-end"
+                      title={`${item.day} : ${item.value}`}
+                    >
+                      <div
+                        className="w-full rounded-t bg-gray-800"
+                        style={{ height }}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
             </div>
 
             <div className="mt-3 flex justify-between text-xs text-gray-500">
@@ -83,7 +121,7 @@ function SimpleBarChart({
               <span>{data[data.length - 1]?.day ?? ''}</span>
             </div>
           </div>
-        </>
+        </div>
       )}
     </section>
   )
@@ -258,11 +296,13 @@ export default function AdminStatsPage() {
       <div className="mt-8 grid grid-cols-1 gap-6">
         <SimpleBarChart
           title="Vues du site par jour — 30 derniers jours"
+          yLabel="Nombre de vues"
           data={stats?.pageViewsLast30Days ?? []}
         />
 
         <SimpleBarChart
           title="Créations de trajets par jour — 30 derniers jours"
+          yLabel="Nombre de créations"
           data={stats?.tripsCreatedLast30Days ?? []}
         />
       </div>
