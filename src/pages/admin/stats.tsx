@@ -59,14 +59,14 @@ function SimpleBarChart({
       ) : (
         <>
           <div className="mt-4">
-            <div className="flex h-56 items-end gap-1 overflow-hidden">
+            <div className="flex h-56 items-stretch gap-1 overflow-hidden">
               {data.map((item) => {
                 const height = `${Math.max((item.value / max) * 100, item.value > 0 ? 4 : 0)}%`
 
                 return (
                   <div
                     key={item.day}
-                    className="flex min-w-0 flex-1 flex-col items-center justify-end"
+                    className="flex h-full min-w-0 flex-1 flex-col items-center justify-end"
                     title={`${item.day}: ${item.value}`}
                   >
                     <div

@@ -68,7 +68,7 @@ export default async function handler(
       pausedTrips,
       archivedTrips,
     ] = await Promise.all([
-      countRows('profiles'),
+      countRows('families'),
       countRows('children'),
       countRows('trips'),
       countTripsByStatus('searching'),
