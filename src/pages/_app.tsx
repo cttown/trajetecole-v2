@@ -1,5 +1,6 @@
 import type { AppProps } from 'next/app'
 import { useState } from 'react'
+import { Analytics } from '@vercel/analytics/next'
 import '../styles/globals.css'
 import Popup from '../components/Popup'
 
@@ -31,6 +32,8 @@ export default function App({ Component, pageProps }: AppProps) {
         {...(pageProps as PagePropsWithPopup)}
         setGlobalPopup={setPopup}
       />
+
+      <Analytics />
     </>
   )
 }
