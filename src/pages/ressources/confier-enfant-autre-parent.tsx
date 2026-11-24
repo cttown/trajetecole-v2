@@ -1,6 +1,8 @@
 import type { CSSProperties } from 'react'
 import Seo from '../../components/Seo'
 import Breadcrumb from '../../components/Breadcrumb'
+import ShareButtons from '../../components/ShareButtons'
+import { SITE_URL } from '../../lib/site'
 import Link from 'next/link'
 import styles from '../../styles/Home.module.css'
 
@@ -183,6 +185,16 @@ export default function ConfierEnfantAutreParentPage() {
                 La confiance se construit progressivement, avec des échanges réguliers, un cadre
                 partagé et une organisation adaptée aux enfants.
               </p>
+            </div>
+
+            <div style={{ marginTop: 28, textAlign: 'center' }}>
+              <p style={{ color: '#5c7699', marginBottom: 14, fontWeight: 600 }}>
+                Cet article peut aider d’autres parents ? Partagez-le :
+              </p>
+              <ShareButtons
+                url={`${SITE_URL}/ressources/confier-enfant-autre-parent`}
+                text="Confier son enfant à un autre parent : comment s'organiser ? — TrajetEcole"
+              />
             </div>
 
             <div className={styles.legalActions}>

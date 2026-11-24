@@ -1,6 +1,8 @@
 import type { CSSProperties } from 'react'
 import Seo from '../../components/Seo'
 import Breadcrumb from '../../components/Breadcrumb'
+import ShareButtons from '../../components/ShareButtons'
+import { SITE_URL } from '../../lib/site'
 import Link from 'next/link'
 import styles from '../../styles/Home.module.css'
 
@@ -178,6 +180,16 @@ export default function ActivitesExtrascolairesPartagerTrajetsPage() {
               <p style={paragraphStyle}>
                 Une fois la confiance installée, l&apos;entraide devient un réflexe.
               </p>
+            </div>
+
+            <div style={{ marginTop: 28, textAlign: 'center' }}>
+              <p style={{ color: '#5c7699', marginBottom: 14, fontWeight: 600 }}>
+                Cet article peut aider d’autres parents ? Partagez-le :
+              </p>
+              <ShareButtons
+                url={`${SITE_URL}/ressources/activites-extrascolaires-partager-trajets`}
+                text="Partager les trajets vers les activités extrascolaires — TrajetEcole"
+              />
             </div>
 
             <div className={styles.legalActions}>

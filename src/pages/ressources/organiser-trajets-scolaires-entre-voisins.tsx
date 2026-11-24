@@ -1,5 +1,7 @@
 import Seo from '../../components/Seo'
 import Breadcrumb from '../../components/Breadcrumb'
+import ShareButtons from '../../components/ShareButtons'
+import { SITE_URL } from '../../lib/site'
 import Link from 'next/link'
 import styles from '../../styles/Home.module.css'
 
@@ -212,6 +214,16 @@ export default function OrganiserTrajetsScolairesEntreVoisinsPage() {
                 d’efforts, mais peut transformer le quotidien de plusieurs familles. Il suffit de
                 trouver les bons voisins, puis de faire le premier pas.
               </p>
+            </div>
+
+            <div style={{ marginTop: 28, textAlign: 'center' }}>
+              <p style={{ color: '#5c7699', marginBottom: 14, fontWeight: 600 }}>
+                Cet article peut aider d’autres parents ? Partagez-le :
+              </p>
+              <ShareButtons
+                url={`${SITE_URL}/ressources/organiser-trajets-scolaires-entre-voisins`}
+                text="Comment organiser les trajets scolaires entre voisins ? — TrajetEcole"
+              />
             </div>
 
             <div className={styles.legalActions}>
