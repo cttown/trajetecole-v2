@@ -188,7 +188,7 @@ export default function ActivitesExtrascolairesPartagerTrajetsPage() {
               </p>
               <ShareButtons
                 url={`${SITE_URL}/ressources/activites-extrascolaires-partager-trajets`}
-                text="Partager les trajets vers les activités extrascolaires — TrajetEcole"
+                text="Partager les trajets vers les activités extrascolaires - TrajetEcole"
               />
             </div>
 

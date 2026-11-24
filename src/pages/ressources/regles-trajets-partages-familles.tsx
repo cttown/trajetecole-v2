@@ -244,7 +244,7 @@ export default function ReglesTrajetsPartagesFamillesPage() {
               </p>
               <ShareButtons
                 url={`${SITE_URL}/ressources/regles-trajets-partages-familles`}
-                text="Trajets partagés entre familles : quelles règles établir ? — TrajetEcole"
+                text="Trajets partagés entre familles : quelles règles établir ? - TrajetEcole"
               />
             </div>
 

@@ -58,7 +58,7 @@ export default function HomePage() {
   return (
     <>
       <Seo
-        title="TrajetEcole – Organiser les trajets à pied des enfants entre familles"
+        title="TrajetEcole - Organiser les trajets à pied des enfants entre familles"
         description="TrajetEcole aide les familles à trouver des trajets compatibles à pied vers l’école, les activités, le conservatoire ou le sport."
         path=""
       />

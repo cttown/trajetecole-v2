@@ -337,13 +337,13 @@ export default function AdminPlacesPage() {
                         <strong>Ville :</strong> {item.city}
                       </div>
                       <div>
-                        <strong>Adresse :</strong> {item.exact_address || '—'}
+                        <strong>Adresse :</strong> {item.exact_address || '-'}
                       </div>
                       <div>
-                        <strong>Code postal :</strong> {item.postal_code || '—'}
+                        <strong>Code postal :</strong> {item.postal_code || '-'}
                       </div>
                       <div>
-                        <strong>Commentaire :</strong> {item.comment || '—'}
+                        <strong>Commentaire :</strong> {item.comment || '-'}
                       </div>
                       <div>
                         <strong>Proposé le :</strong>{' '}

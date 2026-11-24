@@ -92,7 +92,7 @@ const icons: Record<string, ReactNode> = {
 
 export default function ShareButtons({ url, text }: ShareButtonsProps) {
   const shareUrl = url ?? SITE_URL
-  const shareText = text ?? `${SITE_NAME} — organiser les trajets à pied des enfants entre familles`
+  const shareText = text ?? `${SITE_NAME} - organiser les trajets à pied des enfants entre familles`
 
   const [canNativeShare, setCanNativeShare] = useState(false)
   const [copied, setCopied] = useState(false)

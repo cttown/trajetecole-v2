@@ -485,7 +485,7 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
                     </div>
 
                     <span className={styles.badgeBlue}>
-                      {firstTrip ? formatTripStatus(firstTrip.status) : '—'}
+                      {firstTrip ? formatTripStatus(firstTrip.status) : '-'}
                     </span>
                   </div>
 
@@ -710,7 +710,7 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
                             >
                               <span>
                                 {item.label}
-                                {item.source === 'address' ? ' — adresse' : ' — lieu enregistré'}
+                                {item.source === 'address' ? ' - adresse' : ' - lieu enregistré'}
                               </span>
                             </button>
                           ))}
@@ -747,7 +747,7 @@ export default function DashboardTripsPage({ setGlobalPopup }: Props) {
                             >
                               <span>
                                 {item.label}
-                                {item.source === 'address' ? ' — adresse' : ' — lieu enregistré'}
+                                {item.source === 'address' ? ' - adresse' : ' - lieu enregistré'}
                               </span>
                             </button>
                           ))}

@@ -64,7 +64,7 @@ export default function DashboardHomePage() {
               <div>
                 <h1 className={styles.pageTitle}>Mon espace</h1>
                 <p className={styles.pageIntro}>
-                  Connecté avec : <strong>{email || '—'}</strong>
+                  Connecté avec : <strong>{email || '-'}</strong>
                 </p>
               </div>
 

@@ -211,7 +211,7 @@ export default function GagnerTempsMatinEntraideParentsPage() {
               </p>
               <ShareButtons
                 url={`${SITE_URL}/ressources/gagner-temps-matin-entraide-parents`}
-                text="Gagner du temps le matin grâce à l'entraide entre parents — TrajetEcole"
+                text="Gagner du temps le matin grâce à l'entraide entre parents - TrajetEcole"
               />
             </div>
 

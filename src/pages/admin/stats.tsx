@@ -295,13 +295,13 @@ export default function AdminStatsPage() {
 
       <div className="mt-8 grid grid-cols-1 gap-6">
         <SimpleBarChart
-          title="Vues du site par jour — 30 derniers jours"
+          title="Vues du site par jour - 30 derniers jours"
           yLabel="Nombre de vues"
           data={stats?.pageViewsLast30Days ?? []}
         />
 
         <SimpleBarChart
-          title="Créations de trajets par jour — 30 derniers jours"
+          title="Créations de trajets par jour - 30 derniers jours"
           yLabel="Nombre de créations"
           data={stats?.tripsCreatedLast30Days ?? []}
         />

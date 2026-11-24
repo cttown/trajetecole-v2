@@ -92,7 +92,7 @@ function getLocationLabel(
   trip: RequestTripSummary | null,
   side: 'from' | 'to'
 ) {
-  if (!trip) return '—'
+  if (!trip) return '-'
 
   const locationType = side === 'from' ? trip.from_location_type : trip.to_location_type
   const address = side === 'from' ? trip.from_address : trip.to_address
@@ -298,7 +298,7 @@ export default function DashboardRequestsPage({ setGlobalPopup }: Props) {
                     Votre trajet
                   </h4>
                   <p>
-                    <strong>Enfant</strong> : {ownTrip?.child?.first_name || '—'}
+                    <strong>Enfant</strong> : {ownTrip?.child?.first_name || '-'}
                   </p>
                   <p>
                     <strong>Jour</strong> : {formatSingleDay(ownTrip?.day_of_week ?? 0)}

@@ -204,7 +204,7 @@ function buildPlaceLabel(place: PlaceRow) {
     .join(', ')
 
   if (!details) return `${place.name} (${place.city})`
-  return `${place.name} — ${details}`
+  return `${place.name} - ${details}`
 }
 
 function buildAddressId(label: string, lat: number, lng: number) {

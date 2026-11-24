@@ -127,7 +127,7 @@ export default async function handler(
     try {
       await sendEmail({
         to: adminEmail,
-        subject: `Nouveau message parent — ${subject}`,
+        subject: `Nouveau message parent - ${subject}`,
         html: buildEmailLayout({
           title: 'Nouveau message reçu depuis le site',
           intro: `${parentDisplayName} a envoyé un message via le formulaire de contact.`,
@@ -163,7 +163,7 @@ export default async function handler(
     try {
       await sendEmail({
         to: email,
-        subject: 'Nous avons bien reçu votre message — TrajetEcole',
+        subject: 'Nous avons bien reçu votre message - TrajetEcole',
         html: buildEmailLayout({
           title: 'Message bien reçu',
           intro: `Bonjour ${parentFirstName},`,

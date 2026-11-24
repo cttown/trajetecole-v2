@@ -227,7 +227,7 @@ export default function DashboardChildrenPage({ setGlobalPopup }: Props) {
                       <div className={styles.itemHeader}>
                         <div>
                           <h3 className={styles.itemTitle}>{child.first_name}</h3>
-                          <p className={styles.itemMeta}>Niveau : {child.level || '—'}</p>
+                          <p className={styles.itemMeta}>Niveau : {child.level || '-'}</p>
                         </div>
                       </div>
 

@@ -240,12 +240,12 @@ export function formatDayValues(dayValues: number[]) {
 }
 
 export function formatTimeValue(value: string | null) {
-  if (!value) return '—'
+  if (!value) return '-'
   return value.slice(0, 5)
 }
 
 export function formatDateTime(value: string | null) {
-  if (!value) return '—'
+  if (!value) return '-'
   const date = new Date(value)
   return date.toLocaleString('fr-FR', {
     year: 'numeric',
@@ -342,7 +342,7 @@ export function formatTripPlaceLabel(
 }
 
 export function formatTripTimeRange(trip: TripSummary | null) {
-  if (!trip) return '—'
+  if (!trip) return '-'
   return trip.to_time
     ? `${formatTimeValue(trip.from_time)} → ${formatTimeValue(trip.to_time)}`
     : formatTimeValue(trip.from_time)

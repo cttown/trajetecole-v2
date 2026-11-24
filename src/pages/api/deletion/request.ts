@@ -107,7 +107,7 @@ export default async function handler(
     try {
       await sendEmail({
         to: email,
-        subject: 'Confirmez la suppression de vos données — TrajetEcole',
+        subject: 'Confirmez la suppression de vos données - TrajetEcole',
         html: buildEmailLayout({
           title: 'Confirmation requise',
           intro:

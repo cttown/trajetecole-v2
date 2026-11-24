@@ -52,7 +52,7 @@ export default function RessourcesPage() {
   return (
     <>
       <Seo
-        title="Ressources : organiser les trajets scolaires à pied – TrajetEcole"
+        title="Ressources : organiser les trajets scolaires à pied - TrajetEcole"
         description="Conseils pratiques pour mieux organiser les trajets des enfants : école, activités, conservatoire, sport et entraide entre parents."
         path="/ressources"
       />

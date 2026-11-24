@@ -237,7 +237,7 @@ function formatDay(dayOfWeek: number) {
 }
 
 function formatTimeValue(value: string | null) {
-  if (!value) return '—'
+  if (!value) return '-'
   return value.slice(0, 5)
 }
 
@@ -679,20 +679,20 @@ export default async function handler(
           rows: [
             {
               label: 'Enfant',
-              ownTrip: targetChild?.first_name || '—',
-              requesterTrip: '—',
+              ownTrip: targetChild?.first_name || '-',
+              requesterTrip: '-',
             },
             {
               label: 'Jour',
-              ownTrip: targetTrip ? formatDay(targetTrip.day_of_week) : '—',
-              requesterTrip: requesterTrip ? formatDay(requesterTrip.day_of_week) : '—',
+              ownTrip: targetTrip ? formatDay(targetTrip.day_of_week) : '-',
+              requesterTrip: requesterTrip ? formatDay(requesterTrip.day_of_week) : '-',
             },
             {
               label: 'Horaire',
-              ownTrip: targetTrip ? formatTimeValue(targetTrip.from_time) : '—',
+              ownTrip: targetTrip ? formatTimeValue(targetTrip.from_time) : '-',
               requesterTrip: requesterTrip
                 ? `${formatTimeValue(requesterTrip.from_time)}, écart de ${pair.time_diff_min} min`
-                : '—',
+                : '-',
             },
             {
               label: 'Départ',
@@ -703,7 +703,7 @@ export default async function handler(
                     targetTrip.from_address,
                     placeMap
                   )
-                : '—',
+                : '-',
               requesterTrip: pair.from_distance_label,
             },
             {
@@ -715,7 +715,7 @@ export default async function handler(
                     targetTrip.to_address,
                     placeMap
                   )
-                : '—',
+                : '-',
               requesterTrip: pair.to_distance_label,
             },
           ],

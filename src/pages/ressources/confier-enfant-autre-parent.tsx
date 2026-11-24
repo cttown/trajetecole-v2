@@ -193,7 +193,7 @@ export default function ConfierEnfantAutreParentPage() {
               </p>
               <ShareButtons
                 url={`${SITE_URL}/ressources/confier-enfant-autre-parent`}
-                text="Confier son enfant à un autre parent : comment s'organiser ? — TrajetEcole"
+                text="Confier son enfant à un autre parent : comment s'organiser ? - TrajetEcole"
               />
             </div>
 

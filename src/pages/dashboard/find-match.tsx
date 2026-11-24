@@ -274,7 +274,7 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
     }
 
     if (suggestionId) {
-      return 'Lieu provisoire — à remplacer par un lieu ou une adresse'
+      return 'Lieu provisoire - à remplacer par un lieu ou une adresse'
     }
 
     return 'Lieu non renseigné'
@@ -920,7 +920,7 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
                               >
                                 <span>
                                   {item.label}
-                                  {item.source === 'address' ? ' — adresse' : ' — lieu enregistré'}
+                                  {item.source === 'address' ? ' - adresse' : ' - lieu enregistré'}
                                 </span>
                               </button>
                             ))}
@@ -957,7 +957,7 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
                               >
                                 <span>
                                   {item.label}
-                                  {item.source === 'address' ? ' — adresse' : ' — lieu enregistré'}
+                                  {item.source === 'address' ? ' - adresse' : ' - lieu enregistré'}
                                 </span>
                               </button>
                             ))}
@@ -1081,7 +1081,7 @@ export default function DashboardFindMatchPage({ setGlobalPopup }: Props) {
                                     <strong>Jour</strong> : {formatSingleDay(tripMatch.day_of_week)}
                                   </p>
                                   <p>
-                                    <strong>Enfant</strong> : {tripMatch.requester_child_first_name || '—'}
+                                    <strong>Enfant</strong> : {tripMatch.requester_child_first_name || '-'}
                                   </p>
                                   <p>
                                     <strong>Départ</strong> : {tripMatch.requester_from_label}

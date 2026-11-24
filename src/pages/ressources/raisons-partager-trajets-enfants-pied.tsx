@@ -151,7 +151,7 @@ export default function RaisonsPartagerTrajetsEnfantsPiedPage() {
               </p>
               <ShareButtons
                 url={`${SITE_URL}/ressources/raisons-partager-trajets-enfants-pied`}
-                text="5 bonnes raisons de partager les trajets de vos enfants à pied — TrajetEcole"
+                text="5 bonnes raisons de partager les trajets de vos enfants à pied - TrajetEcole"
               />
             </div>
 

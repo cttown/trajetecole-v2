@@ -26,9 +26,8 @@ export default function PartagerPage() {
             <div className={styles.legalCard}>
               <p>
                 Plus il y a de familles inscrites près de chez vous, plus les correspondances de
-                trajets sont nombreuses. En partageant le site autour de vous — à la sortie de
-                l’école, dans les groupes de parents ou sur vos réseaux — vous aidez d’autres
-                familles à s’organiser plus facilement.
+                trajets sont nombreuses. Partagez le site autour de vous pour aider d’autres
+                familles à s’organiser.
               </p>
 
               <p style={{ marginTop: 16, fontWeight: 600 }}>Choisissez comment partager :</p>
@@ -36,11 +35,6 @@ export default function PartagerPage() {
               <div style={{ marginTop: 20 }}>
                 <ShareButtons />
               </div>
-
-              <p style={{ marginTop: 20, fontSize: 14, color: '#5c7699', textAlign: 'center' }}>
-                Sur téléphone, le bouton « Partager » ouvre directement le menu de votre appareil
-                (Facebook, WhatsApp, Messages…).
-              </p>
             </div>
 
             <div className={styles.legalActions}>

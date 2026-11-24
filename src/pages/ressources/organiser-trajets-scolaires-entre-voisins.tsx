@@ -222,7 +222,7 @@ export default function OrganiserTrajetsScolairesEntreVoisinsPage() {
               </p>
               <ShareButtons
                 url={`${SITE_URL}/ressources/organiser-trajets-scolaires-entre-voisins`}
-                text="Comment organiser les trajets scolaires entre voisins ? — TrajetEcole"
+                text="Comment organiser les trajets scolaires entre voisins ? - TrajetEcole"
               />
             </div>
 
