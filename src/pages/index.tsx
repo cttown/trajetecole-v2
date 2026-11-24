@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Seo from '../components/Seo'
+import ShareButtons from '../components/ShareButtons'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { supabase } from '../lib/supabaseClient'
@@ -232,6 +233,26 @@ export default function HomePage() {
                 En savoir plus sur la confidentialité
               </Link>
             </div>
+          </div>
+        </section>
+
+        <section className={styles.stepsSection}>
+          <div className={styles.container}>
+            <h2 className={styles.sectionTitle}>Faites connaître TrajetEcole</h2>
+
+            <p
+              style={{
+                textAlign: 'center',
+                color: '#5c7699',
+                maxWidth: 620,
+                margin: '0 auto 22px',
+              }}
+            >
+              Plus il y a de familles inscrites près de chez vous, plus les correspondances sont
+              nombreuses. Partagez le site autour de vous :
+            </p>
+
+            <ShareButtons />
           </div>
         </section>
 
