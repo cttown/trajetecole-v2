@@ -17,6 +17,7 @@ export async function getServerSideProps({ res }) {
     { url: '/ressources/gagner-temps-matin-entraide-parents', priority: '0.5', changefreq: 'monthly' },
     { url: '/ressources/regles-trajets-partages-familles', priority: '0.5', changefreq: 'monthly' },
     { url: '/ressources/confier-enfant-autre-parent', priority: '0.5', changefreq: 'monthly' },
+    { url: '/ressources/trouver-nounou-ecole-tour-de-role-parents', priority: '0.5', changefreq: 'monthly' },
   ];
 
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>

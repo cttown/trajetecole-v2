@@ -46,6 +46,13 @@ const resources = [
     href: '/ressources/raisons-partager-trajets-enfants-pied',
     icon: '🌿',
   },
+  {
+    title: 'Trouver une nounou pour emmener vos enfants à l’école : le tour de rôle entre parents',
+    description:
+      'Avant de payer une garde, découvrez comment vous relayer entre parents voisins, gratuitement et simplement.',
+    href: '/ressources/trouver-nounou-ecole-tour-de-role-parents',
+    icon: '🔁',
+  },
 ]
 
 export default function RessourcesPage() {
